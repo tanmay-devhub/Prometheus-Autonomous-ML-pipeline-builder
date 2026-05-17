@@ -1,0 +1,65 @@
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ─────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Secrets / environment ────────────────────────────────────
+.env
+.env.local
+.env.production
+frontend/.env.local
+
+# ── Databases ────────────────────────────────────────────────
+*.db
+*.sqlite3
+
+# ── ML artifacts & uploads ───────────────────────────────────
+mlruns/
+artifacts/
+uploads/
+*.pkl
+*.joblib
+
+# Ignore CSVs everywhere except the demo_datasets folder
+*.csv
+!demo_datasets/
+!demo_datasets/*.csv
+
+# ── Logs & Celery ────────────────────────────────────────────
+*.log
+celerybeat-schedule
+celerybeat.pid
+
+# ── Node / Next.js ───────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+npm-debug.log*
+yarn-error.log*
+
+# ── IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
