@@ -1,8 +1,8 @@
-# Prometheus — Autonomous ML Pipeline Builder
+# Prometheus: Autonomous ML Pipeline Builder
 
-Prometheus takes a plain-English description of an ML problem and a CSV file, then autonomously builds, debugs, evaluates, and packages a production-ready ML model — with two human approval gates and a live in-browser test panel.
+Prometheus takes a plain-English description of an ML problem and a CSV file, then autonomously builds, debugs, evaluates, and packages a production-ready ML model with two human approval gates and a live in-browser test panel.
 
-> **v1 — Binary classification only.** Regression support is planned for v2.
+> **v1 Binary classification only.** Regression support is planned for v2.
 
 ---
 
@@ -21,7 +21,7 @@ All results on truly held-out rows not seen during training, tested live through
 ## What it does
 
 1. **Analyzes** your problem description and infers task type, target column, and evaluation metric
-2. **Profiles** your dataset — null rates, distributions, class imbalance, leakage warnings
+2. **Profiles** your dataset null rates, distributions, class imbalance, leakage warnings
 3. **Designs** two architecturally distinct ML pipeline architectures in parallel
 4. **Executes** both pipelines in isolated E2B cloud sandboxes with automatic debugging on failure
 5. **Selects** the winning model with a written justification
@@ -32,15 +32,15 @@ All results on truly held-out rows not seen during training, tested live through
 
 ## Features
 
-- **Zero-code ML** — describe your problem in plain English, upload a CSV, done
-- **Autonomous debugging** — up to 3 retries per experiment with LLM-guided fixes; regenerates from scratch if stuck in the same failure loop
-- **Smart preprocessing** — binary encoding, one-hot encoding, NaN-consistent imputation, and class balancing handled automatically
-- **Two human approval gates** — review problem analysis before training; review model results before deployment
-- **In-browser test panel** — predict live against your trained model; filter by class or test unseen held-out rows (shown as diamonds ◆)
-- **Downloadable artifacts** — `endpoint.py` + `model.pkl` for self-hosting
-- **Full audit trail** — every agent decision, LLM call, retry, and fix logged in the debug log
-- **MLflow tracking** — all experiments tracked with parameters, metrics, and code snapshots
-- **Free-tier AI** — Ollama (local LLMs) + Gemini free tier; no paid API required
+- **Zero-code ML** describe your problem in plain English, upload a CSV, done
+- **Autonomous debugging** up to 3 retries per experiment with LLM-guided fixes; regenerates from scratch if stuck in the same failure loop
+- **Smart preprocessing** binary encoding, one-hot encoding, NaN-consistent imputation, and class balancing handled automatically
+- **Two human approval gates** review problem analysis before training; review model results before deployment
+- **In-browser test panel** predict live against your trained model; filter by class or test unseen held-out rows (shown as diamonds ◆)
+- **Downloadable artifacts** `endpoint.py` + `model.pkl` for self-hosting
+- **Full audit trail** every agent decision, LLM call, retry, and fix logged in the debug log
+- **MLflow tracking** all experiments tracked with parameters, metrics, and code snapshots
+- **Free-tier AI** Ollama (local LLMs) + Gemini free tier; no paid API required
 
 ---
 
@@ -50,7 +50,7 @@ All results on truly held-out rows not seen during training, tested live through
 Upload CSV + description
         │
         ▼
-  problem_analyzer          ← llama3.1:8b  — infers task type, target column, metric
+  problem_analyzer          ← llama3.1:8b  infers task type, target column, metric
         │
         ▼
   ─── APPROVAL GATE 1 ───   ← user confirms / corrects task type and target
@@ -59,7 +59,7 @@ Upload CSV + description
   data_profiler             ← stats, null rates, leakage detection, imbalance check
         │
         ▼
-  pipeline_designer         ← llama3.1:8b  — designs 2 contrasting architectures
+  pipeline_designer         ← llama3.1:8b  designs 2 contrasting architectures
         │
         ├────────────────────────────────────────────────┐
         ▼                                                ▼
@@ -72,7 +72,7 @@ Upload CSV + description
         └──────────────────── JOIN ──────────────────────┘
                               │
                               ▼
-                      model_selector             ← Gemini 1.5 Flash — picks winner
+                      model_selector             ← Gemini 1.5 Flash picks winner
                               │
                               ▼
                   ─── APPROVAL GATE 2 ───        ← user approves model before deployment
@@ -121,7 +121,7 @@ Upload CSV + description
 | Python 3.11+ | Backend + Celery |
 | Node.js 18+ | Frontend |
 | [Ollama](https://ollama.ai) | Local LLM inference |
-| [E2B API key](https://e2b.dev) | Sandbox execution — free tier available |
+| [E2B API key](https://e2b.dev) | Sandbox execution free tier available |
 | [Gemini API key](https://aistudio.google.com) | Free tier, 1M tokens/day |
 | Docker Desktop | Redis + MLflow via `docker-compose` |
 
@@ -135,7 +135,7 @@ Upload CSV + description
 git clone https://github.com/your-username/prometheus.git
 cd prometheus
 cp .env.example .env
-# Edit .env — fill in GEMINI_API_KEY and E2B_API_KEY
+# Edit .env fill in GEMINI_API_KEY and E2B_API_KEY
 ```
 
 ### 2. Install dependencies
@@ -157,7 +157,7 @@ ollama pull deepseek-coder:6.7b
 
 ### 4. Start services
 
-**Windows — one-click:**
+**Windows one-click:**
 ```
 start.bat
 ```
@@ -165,22 +165,22 @@ start.bat
 **Manual (all platforms):**
 
 ```bash
-# Terminal 1 — Ollama
+# Terminal 1 Ollama
 ollama serve
 
-# Terminal 2 — Redis + MLflow
+# Terminal 2 Redis + MLflow
 docker-compose up -d
 
-# Terminal 3 — FastAPI backend
+# Terminal 3 FastAPI backend
 uvicorn backend.main:app --reload --port 8000
 
-# Terminal 4 — Celery worker
+# Terminal 4 Celery worker
 # Windows:
 celery -A backend.celery_app worker --loglevel=info --pool=solo
 # Linux / macOS:
 celery -A backend.celery_app worker --loglevel=info
 
-# Terminal 5 — Frontend
+# Terminal 5 Frontend
 cd frontend && npm run dev
 ```
 
@@ -196,7 +196,7 @@ cd frontend && npm run dev
 
 ## Preprocessing (automatic)
 
-All preprocessing is applied identically in training and at prediction time — no manual feature engineering required.
+All preprocessing is applied identically in training and at prediction time no manual feature engineering required.
 
 | Step | What happens |
 |------|-------------|
@@ -230,10 +230,10 @@ uvicorn endpoint:app --host 0.0.0.0 --port 8001
 Open **http://localhost:8001/docs** for interactive Swagger UI.
 
 The endpoint exposes:
-- `POST /predict` — submit feature values, get prediction + probability + original label
-- `GET /encoding` — inspect how input features are encoded
-- `GET /features` — list required input fields
-- `GET /health` — liveness check
+- `POST /predict` submit feature values, get prediction + probability + original label
+- `GET /encoding` inspect how input features are encoded
+- `GET /features` list required input fields
+- `GET /health` liveness check
 
 ---
 
@@ -281,7 +281,7 @@ prometheus/
 │   ├── routers/             # FastAPI endpoints
 │   ├── tracking/            # MLflow integration
 │   ├── main.py
-│   ├── state.py             # PrometheusState TypedDict — single source of truth
+│   ├── state.py             # PrometheusState TypedDict single source of truth
 │   ├── graph.py             # Parallel experiment runner
 │   └── db.py                # SQLite persistence
 ├── execution/
@@ -306,31 +306,14 @@ prometheus/
 
 ---
 
-## Roadmap
-
-- [x] Binary classification — end-to-end pipeline
-- [x] Automatic preprocessing — encoding, imputation, class balancing
-- [x] Live prediction panel with unseen held-out row testing
-- [x] Model card + SHAP feature importance + plain-English explanation
-- [x] FastAPI endpoint generation + `model.pkl` download
-- [x] Autonomous debug loop with regeneration on repeated failures
-- [x] Two human approval gates
-- [x] MLflow experiment tracking
-- [ ] **Regression** — v2
-- [ ] Multi-class classification — v2
-- [ ] Time-series support — v3
-- [ ] Cloud deployment — v3
-
----
-
 ## Known limitations
 
-- **Binary classification only** — regression and multi-class are blocked in v1
-- **Tabular data only** — no image, text, audio, or time-series support
-- **E2B required** — experiments need an active E2B API key and internet access
-- **Ollama must run locally** — LLM inference is not remote; Ollama must be on the same machine as the backend
-- **Windows Celery** — requires `--pool=solo`; Linux/macOS should use the default `prefork` pool
-- **sklearn version coupling** — `model.pkl` is built in E2B; if loading locally fails, pin `scikit-learn>=1.3.0,<2.0.0`
+- **Binary classification only**  regression and multi-class are blocked in v1
+- **Tabular data only** no image, text, audio, or time-series support
+- **E2B required** experiments need an active E2B API key and internet access
+- **Ollama must run locally** LLM inference is not remote; Ollama must be on the same machine as the backend
+- **Windows Celery** requires `--pool=solo`; Linux/macOS should use the default `prefork` pool
+- **sklearn version coupling** `model.pkl` is built in E2B; if loading locally fails, pin `scikit-learn>=1.3.0,<2.0.0`
 
 ---
 
