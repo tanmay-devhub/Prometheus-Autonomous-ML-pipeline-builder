@@ -3,6 +3,9 @@ import asyncio
 from datetime import datetime
 from typing import Any, Dict
 
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
 from backend.state import PrometheusState
 from backend.llm.router import LLMRouter
 from backend.config import ALLOWED_TASK_TYPES, ALLOWED_METRICS
@@ -36,6 +39,57 @@ CORRECTIVE_COLUMN_PROMPT = (
     "You must choose target_column from exactly these column names: {columns}. "
     "Return only the corrected JSON object."
 )
+
+
+def _recompute_held_out_rows(state: PrometheusState) -> None:
+    """Recompute dataset_held_out_rows using the confirmed target_column."""
+    target_col = state["target_column"]
+    task_type = state["task_type"]
+
+    try:
+        df = pd.read_csv(state["dataset_path"])
+        df = df.dropna(subset=[target_col])
+
+        unique_vals = df[target_col].dropna().unique()
+        is_cls = task_type == "binary_classification" or len(unique_vals) <= 10
+
+        def _clean(v: Any) -> Any:
+            if isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf")):
+                return None
+            return v
+
+        # Build stratify series — drop NaN to avoid sklearn error
+        if is_cls:
+            strat = df[target_col]
+            # Fall back to no stratification if any NaN remain or too few per class
+            min_class_count = strat.value_counts().min() if len(strat) > 0 else 0
+            if strat.isna().any() or min_class_count < 2:
+                strat = None
+        else:
+            strat = None
+
+        _, test_df = train_test_split(df, test_size=0.2, random_state=42, stratify=strat)
+
+        if is_cls:
+            per_class = max(15, 40 // max(len(unique_vals), 1))
+            parts = [
+                test_df[test_df[target_col] == v].sample(
+                    min(per_class, int((test_df[target_col] == v).sum())),
+                    random_state=7,
+                )
+                for v in unique_vals
+                if v in test_df[target_col].values
+            ]
+            held_df = pd.concat(parts).sample(frac=1, random_state=7)
+        else:
+            held_df = test_df.sample(min(40, len(test_df)), random_state=7)
+
+        state["dataset_held_out_rows"] = [
+            {k: _clean(v) for k, v in row.items()}
+            for row in held_df.to_dict(orient="records")
+        ]
+    except Exception:
+        pass  # Keep whatever was computed at upload time
 
 
 async def problem_analyzer_node(state: PrometheusState) -> PrometheusState:
@@ -95,6 +149,11 @@ async def problem_analyzer_node(state: PrometheusState) -> PrometheusState:
     state["evaluation_metric"] = parsed.get("evaluation_metric")
     state["domain_flags"] = parsed.get("domain_flags", [])
     state["problem_analysis_raw"] = json.dumps(parsed)
+
+    # Recompute held-out rows now that the real target column is known.
+    # The upload-time guess used last_col which is often wrong (e.g. Titanic uses Embarked
+    # as last_col → NaN stratify fails → empty held_out_rows → no Unseen button).
+    _recompute_held_out_rows(state)
 
     state["debug_log"].append({
         "phase": "problem_analyzer",

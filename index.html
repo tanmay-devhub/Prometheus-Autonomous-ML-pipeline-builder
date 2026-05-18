@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prometheus — Autonomous ML Pipeline</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink: {
+            950: '#0A0E1A', 900: '#0F1421', 850: '#141A2A', 800: '#1A2235',
+            750: '#212B42', 700: '#2A364F', 600: '#3A4866', 500: '#5A6985',
+            400: '#8593AD', 300: '#B4BFD4', 200: '#D6DCE8', 100: '#EEF1F7',
+          },
+          accent: {
+            blue: '#3B82F6', blueDim: '#2563EB', blueGlow: '#60A5FA',
+            emerald: '#10B981', emeraldDim: '#059669',
+            amber: '#F59E0B', rose: '#F43F5E', gold: '#FBBF24', violet: '#8B5CF6',
+          }
+        },
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        boxShadow: {
+          'glow-blue':    '0 0 0 1px rgba(59,130,246,.4), 0 0 24px -4px rgba(59,130,246,.45)',
+          'glow-emerald': '0 0 0 1px rgba(16,185,129,.4), 0 0 24px -4px rgba(16,185,129,.45)',
+          'glow-gold':    '0 0 0 1px rgba(251,191,36,.5), 0 0 32px -4px rgba(251,191,36,.55)',
+        }
+      }
+    }
+  }
+</script>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/framer-motion@11.18.2/dist/framer-motion.js"></script>
+
+<style>
+/* ── Prometheus global styles ── */
+html, body, #root { height: 100%; }
+body {
+  background: radial-gradient(1200px 700px at 20% -10%, rgba(59,130,246,.08), transparent 60%),
+              radial-gradient(900px 600px at 100% 100%, rgba(16,185,129,.06), transparent 60%),
+              #0A0E1A;
+  background-attachment: fixed;
+}
+.bg-grid {
+  background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px; background-position: center;
+}
+.bg-grid-fine {
+  background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+@keyframes pulseRing {
+  0%   { box-shadow: 0 0 0 0   rgba(59,130,246,.6), 0 0 0 0 rgba(59,130,246,.3); }
+  70%  { box-shadow: 0 0 0 8px rgba(59,130,246,0),  0 0 0 16px rgba(59,130,246,0); }
+  100% { box-shadow: 0 0 0 0   rgba(59,130,246,0),  0 0 0 0 rgba(59,130,246,0); }
+}
+.pulse-ring { animation: pulseRing 1.8s ease-out infinite; }
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .55; transform: scale(.85); }
+}
+.pulse-dot { animation: pulseDot 1.4s ease-in-out infinite; }
+@keyframes liquidPour {
+  0%   { transform: scaleX(0); transform-origin: left; }
+  100% { transform: scaleX(1); transform-origin: left; }
+}
+.liquid-pour { animation: liquidPour .9s cubic-bezier(.65,.05,.36,1) forwards; }
+@keyframes spin360 { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin360 2.4s linear infinite; }
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,.03) 0%, rgba(255,255,255,.10) 50%, rgba(255,255,255,.03) 100%);
+  background-size: 200% 100%; animation: shimmer 1.8s ease-in-out infinite;
+}
+@keyframes waterfallUp {
+  0%   { transform: translateY(100%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(-120%); opacity: 0; }
+}
+.waterfall-row {
+  position: absolute; left: 0; right: 0;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: rgba(96,165,250,.8); white-space: nowrap;
+  animation: waterfallUp linear infinite;
+}
+@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+.blink { animation: blink 1s steps(1) infinite; }
+.card-lift { transition: transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .35s ease; }
+.card-lift:hover { transform: translateY(-2px); }
+.glass {
+  background: linear-gradient(180deg, rgba(20,26,42,.7) 0%, rgba(15,20,33,.85) 100%);
+  border: 1px solid rgba(148,163,184,.10); backdrop-filter: blur(8px);
+}
+.glass-strong {
+  background: linear-gradient(180deg, rgba(26,34,53,.85) 0%, rgba(15,20,33,.92) 100%);
+  border: 1px solid rgba(148,163,184,.12);
+}
+.dropzone { border: 1.5px dashed rgba(148,163,184,.25); transition: border-color .25s ease, background-color .25s ease, transform .25s ease; }
+.dropzone.dragging { border-color: rgba(59,130,246,.7); background-color: rgba(59,130,246,.06); transform: scale(1.01); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.confetti { position: absolute; width: 8px; height: 8px; pointer-events: none; }
+.tok-kw  { color: #C792EA; } .tok-fn  { color: #82AAFF; } .tok-str { color: #C3E88D; }
+.tok-num { color: #F78C6C; } .tok-cmt { color: #546E7A; font-style: italic; }
+.tok-var { color: #EEFFFF; } .tok-pun { color: #89DDFF; }
+.gauge-track { stroke: rgba(148,163,184,.15); }
+.gauge-fill  { stroke: url(#gaugeGrad); filter: drop-shadow(0 0 8px rgba(59,130,246,.4)); }
+input:focus, textarea:focus, button:focus { outline: none; }
+input:focus-visible, textarea:focus-visible { box-shadow: 0 0 0 2px rgba(59,130,246,.5); }
+::selection { background: rgba(59,130,246,.4); color: white; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(148,163,184,.18); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.32); background-clip: content-box; border: 2px solid transparent; }
+.eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: rgba(133,147,173,.85); }
+.dot { width: 6px; height: 6px; border-radius: 999px; display: inline-block; }
+</style>
+</head>
+<body class="bg-ink-950 text-ink-100 font-sans antialiased overflow-hidden">
+
+<div id="root"></div>
+
+<script type="text/babel">
+// ── tweaks-panel ──────────────────────────────────────────────────────────────
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  select.twk-field{padding-right:22px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");background-repeat:no-repeat;background-position:right 8px center}
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2}
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+`;
+
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel">
+        <div className="twk-hd"><b>{title}</b><button className="twk-x" onClick={() => setOpen(false)}>✕</button></div>
+        <div className="twk-body">{children}</div>
+      </div>
+    </>
+  );
+}
+function TweakSection({ label, children }) { return <><div className="twk-sect">{label}</div>{children}</>; }
+function TweakRow({ label, children }) { return <div className="twk-row"><div className="twk-lbl"><span>{label}</span></div>{children}</div>; }
+function TweakToggle({ label, value, onChange }) {
+  return <div className="twk-row twk-row-h"><div className="twk-lbl"><span>{label}</span></div><button type="button" className="twk-toggle" data-on={value ? '1' : '0'} onClick={() => onChange(!value)}><i/></button></div>;
+}
+function TweakRadio({ label, value, options, onChange }) {
+  const opts = options.map(o => typeof o === 'object' ? o : { value: o, label: o });
+  const idx = Math.max(0, opts.findIndex(o => o.value === value));
+  const n = opts.length;
+  return (
+    <TweakRow label={label}>
+      <div role="radiogroup" className="twk-seg">
+        <div className="twk-seg-thumb" style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`, width: `calc((100% - 4px) / ${n})` }}/>
+        {opts.map(o => <button key={o.value} type="button" onClick={() => onChange(o.value)}>{o.label}</button>)}
+      </div>
+    </TweakRow>
+  );
+}
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={e => onChange(e.target.value)}>
+        {options.map(o => { const v = typeof o === 'object' ? o.value : o; const l = typeof o === 'object' ? o.label : o; return <option key={v} value={v}>{l}</option>; })}
+      </select>
+    </TweakRow>
+  );
+}
+</script>
+
+<script type="text/babel">
+// ── shared components ─────────────────────────────────────────────────────────
+const { motion, AnimatePresence, animate } = window.framerMotion || window.Motion || {};
+const { useState, useEffect, useRef, useMemo, useLayoutEffect } = React;
+
+const STAGES = [
+  { id: 'analyze',    label: 'Analyze' },
+  { id: 'profile',    label: 'Profile' },
+  { id: 'approve',    label: 'Approve' },
+  { id: 'experiment', label: 'Experiment' },
+  { id: 'select',     label: 'Select Model' },
+  { id: 'generate',   label: 'Generate Output' },
+  { id: 'complete',   label: 'Complete' },
+];
+const VIEW_TO_STAGE = { upload:-1, approval:2, profile:1, experiment:3, select:4, complete:6, failed:3 };
+
+function CountUp({ to, duration = 1.2, decimals = 3, prefix = '', suffix = '', className = '' }) {
+  const [val, setVal] = useState(0);
+  const fromRef = useRef(0);
+  useEffect(() => {
+    const start = performance.now();
+    const from = fromRef.current;
+    let raf;
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / (duration * 1000));
+      const eased = 1 - Math.pow(1 - t, 3);
+      setVal(from + (to - from) * eased);
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else fromRef.current = to;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [to, duration]);
+  return <span className={className}>{prefix}{val.toFixed(decimals)}{suffix}</span>;
+}
+
+function PollingIndicator({ active = true, label = 'polling' }) {
+  return (
+    <div className="flex items-center gap-2 text-ink-400">
+      <svg width="14" height="14" viewBox="0 0 24 24" className={active ? 'spin-slow' : ''}>
+        <circle cx="12" cy="12" r="9" stroke="rgba(148,163,184,.2)" strokeWidth="2" fill="none"/>
+        <path d="M12 3 a 9 9 0 0 1 9 9" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" fill="none"/>
+      </svg>
+      <span className="eyebrow text-[10px]">{label} · 3s</span>
+    </div>
+  );
+}
+
+function PipelineProgressBar({ activeIndex }) {
+  return (
+    <div className="w-full px-8 pt-6 pb-5">
+      <div className="flex items-center w-full max-w-[1280px] mx-auto">
+        {STAGES.map((s, i) => {
+          const done = i < activeIndex, active = i === activeIndex, segDone = i < activeIndex;
+          return (
+            <React.Fragment key={s.id}>
+              <div className="flex flex-col items-center relative" style={{ minWidth: 0 }}>
+                <div className="relative">
+                  <div className={['w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-300',
+                    done   && 'bg-accent-emerald/15 border border-accent-emerald/60',
+                    active && 'bg-accent-blue/15 border border-accent-blue/70 pulse-ring',
+                    !done && !active && 'bg-ink-850 border border-ink-700',
+                  ].filter(Boolean).join(' ')}>
+                    {done ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12.5 L10 17 L19 7" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    ) : active ? (
+                      <span className="w-2 h-2 rounded-full bg-accent-blue pulse-dot"/>
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-ink-600"/>
+                    )}
+                  </div>
+                </div>
+                <div className={['mt-2 text-[11px] font-medium whitespace-nowrap',
+                  done    && 'text-accent-emerald',
+                  active  && 'text-ink-100',
+                  !done && !active && 'text-ink-500',
+                ].filter(Boolean).join(' ')}>
+                  <span className="font-mono text-ink-500 mr-1.5">{String(i+1).padStart(2,'0')}</span>
+                  {s.label}
+                </div>
+              </div>
+              {i < STAGES.length - 1 && (
+                <div className="flex-1 h-px relative mx-2 mb-5">
+                  <div className="absolute inset-0 bg-ink-700"/>
+                  {segDone && (
+                    <div key={`seg-${i}-${activeIndex}`} className="absolute inset-0 liquid-pour"
+                      style={{ background:'linear-gradient(90deg, rgba(16,185,129,.9) 0%, rgba(59,130,246,.9) 100%)', boxShadow:'0 0 8px rgba(59,130,246,.5)' }}/>
+                  )}
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ jobId, polling }) {
+  return (
+    <div className="flex items-center justify-between px-8 pt-5 pb-2">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-blue to-accent-violet flex items-center justify-center shadow-glow-blue">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2 L4 7 L4 17 L12 22 L20 17 L20 7 Z" stroke="white" strokeWidth="1.5" fill="none"/>
+            <path d="M12 2 L12 22 M4 7 L20 17 M20 7 L4 17" stroke="white" strokeWidth="1" opacity=".6"/>
+          </svg>
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold tracking-tight">Prometheus</div>
+          <div className="eyebrow text-[9.5px] -mt-px">autonomous ml pipeline</div>
+        </div>
+        {jobId && (
+          <div className="ml-6 pl-6 border-l border-ink-700/60">
+            <div className="eyebrow text-[9.5px]">job</div>
+            <div className="font-mono text-[12px] text-ink-200">{jobId}</div>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-5">
+        <PollingIndicator active={polling}/>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-ink-800/60 border border-ink-700/60">
+          <span className="w-7 h-7 rounded-full bg-gradient-to-br from-accent-emerald to-accent-blue"/>
+          <span className="text-[12px] text-ink-200">alex@lab.io</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TerminalLog({ lines, running, accent = 'blue', height = 220 }) {
+  const scrollerRef = useRef(null);
+  useLayoutEffect(() => { const el = scrollerRef.current; if (el) el.scrollTop = el.scrollHeight; }, [lines]);
+  const dotColor = accent === 'emerald' ? 'bg-accent-emerald' : 'bg-accent-blue';
+  return (
+    <div className="rounded-lg bg-[#070A12] border border-ink-700/70 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-ink-850/80 border-b border-ink-700/50">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F57]/70"/>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]/70"/>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]/70"/>
+        </div>
+        <div className="font-mono text-[10px] text-ink-500 tracking-wide">train.log · tail -f</div>
+        <span className={`dot ${dotColor} ${running ? 'pulse-dot' : ''}`}/>
+      </div>
+      <div ref={scrollerRef} className="px-3 py-2 font-mono text-[11.5px] leading-relaxed no-scrollbar overflow-y-auto" style={{ height }}>
+        {lines.map((l, i) => (
+          <div key={i} className="flex gap-2">
+            <span className="text-ink-600 select-none w-7 text-right shrink-0">{String(i+1).padStart(3,'0')}</span>
+            <span className="text-ink-600 select-none">›</span>
+            <span className={l.kind==='err'?'text-accent-rose':l.kind==='ok'?'text-accent-emerald':l.kind==='warn'?'text-accent-amber':l.kind==='info'?'text-ink-300':'text-ink-400'}>{l.text}</span>
+          </div>
+        ))}
+        {running && (
+          <div className="flex gap-2">
+            <span className="text-ink-600 select-none w-7 text-right shrink-0">{String(lines.length+1).padStart(3,'0')}</span>
+            <span className="text-ink-600 select-none">›</span>
+            <span className="text-ink-300"><span className="blink inline-block w-2 h-3.5 bg-accent-blue align-middle ml-0.5"/></span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CircularProgress({ value, total = 3, size = 44, stroke = 4, color = '#3B82F6', label }) {
+  const r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, value / total)), dash = c * pct;
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size/2} cy={size/2} r={r} stroke="rgba(148,163,184,.18)" strokeWidth={stroke} fill="none"/>
+        <circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round"
+          strokeDasharray={`${dash} ${c}`} style={{ transition:'stroke-dasharray .6s cubic-bezier(.4,0,.2,1)' }}/>
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="font-mono text-[11px] font-semibold text-ink-100 leading-none">{value}<span className="text-ink-500">/{total}</span></div>
+        {label && <div className="eyebrow text-[8px] leading-none mt-0.5">{label}</div>}
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    running:  { dot:'bg-accent-blue',    bg:'bg-accent-blue/10',    text:'text-accent-blueGlow', border:'border-accent-blue/30',    label:'Running'  },
+    retrying: { dot:'bg-accent-amber',   bg:'bg-accent-amber/10',   text:'text-accent-amber',    border:'border-accent-amber/30',   label:'Retrying' },
+    success:  { dot:'bg-accent-emerald', bg:'bg-accent-emerald/10', text:'text-accent-emerald',  border:'border-accent-emerald/30', label:'Success'  },
+    failed:   { dot:'bg-accent-rose',    bg:'bg-accent-rose/10',    text:'text-accent-rose',     border:'border-accent-rose/30',    label:'Failed'   },
+    pending:  { dot:'bg-ink-500',        bg:'bg-ink-800/60',        text:'text-ink-400',         border:'border-ink-700',          label:'Queued'   },
+  };
+  const s = map[status] || map.pending;
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${s.bg} ${s.border} ${s.text}`}>
+      <span className={`dot ${s.dot} ${status==='running'||status==='retrying'?'pulse-dot':''}`}/>
+      <span className="text-[11px] font-medium tracking-wide">{s.label}</span>
+    </div>
+  );
+}
+
+function SectionTitle({ index, title, subtitle, right }) {
+  return (
+    <div className="flex items-end justify-between mb-6">
+      <div>
+        <div className="eyebrow">{index} · phase</div>
+        <div className="text-[26px] font-semibold tracking-tight mt-1">{title}</div>
+        {subtitle && <div className="text-ink-400 text-[13.5px] mt-1.5 max-w-xl">{subtitle}</div>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function Confetti({ trigger }) {
+  const [pieces, setPieces] = useState([]);
+  useEffect(() => {
+    if (!trigger) return;
+    const colors = ['#3B82F6','#10B981','#FBBF24','#8B5CF6','#F43F5E'];
+    const p = Array.from({ length: 60 }).map((_, i) => ({
+      id: i + Math.random(), x: 50 + (Math.random()-.5)*20, y: 50,
+      dx: (Math.random()-.5)*600, dy: -200 - Math.random()*300,
+      rot: Math.random()*720-360, color: colors[i%colors.length],
+      shape: Math.random()>.5?'rect':'circle', delay: Math.random()*0.15,
+    }));
+    setPieces(p);
+    const t = setTimeout(() => setPieces([]), 2200);
+    return () => clearTimeout(t);
+  }, [trigger]);
+  if (!pieces.length) return null;
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {pieces.map(p => (
+        <motion.div key={p.id} className="confetti"
+          initial={{ x:0, y:0, rotate:0, opacity:1 }}
+          animate={{ x:p.dx, y:p.dy+400, rotate:p.rot, opacity:0 }}
+          transition={{ duration:1.6, delay:p.delay, ease:[.2,.7,.3,1] }}
+          style={{ left:`${p.x}%`, top:`${p.y}%`, background:p.color, borderRadius:p.shape==='circle'?'50%':'2px' }}/>
+      ))}
+    </div>
+  );
+}
+
+function PrimaryButton({ children, color='blue', onClick, disabled, icon, size='md', className='' }) {
+  const palette = {
+    blue:    'bg-accent-blue hover:bg-accent-blueDim border-accent-blue/40 text-white shadow-glow-blue',
+    emerald: 'bg-accent-emerald hover:bg-accent-emeraldDim border-accent-emerald/40 text-white shadow-glow-emerald',
+    rose:    'bg-accent-rose hover:bg-accent-rose/85 border-accent-rose/40 text-white',
+    ghost:   'bg-ink-800/60 hover:bg-ink-750 border-ink-700 text-ink-200',
+  };
+  const sizes = { sm:'px-3 py-1.5 text-[12px]', md:'px-4 py-2.5 text-[13px]', lg:'px-5 py-3 text-[14px]' };
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 rounded-md font-medium tracking-tight border transition-all duration-200 active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed ${palette[color]} ${sizes[size]} ${className}`}>
+      {icon}{children}
+    </button>
+  );
+}
+
+function OutlineButton({ children, color='rose', onClick, icon, size='md', className='' }) {
+  const palette = {
+    rose:    'border-accent-rose/50 text-accent-rose hover:bg-accent-rose/10',
+    emerald: 'border-accent-emerald/50 text-accent-emerald hover:bg-accent-emerald/10',
+    blue:    'border-accent-blue/50 text-accent-blueGlow hover:bg-accent-blue/10',
+    ink:     'border-ink-700 text-ink-200 hover:bg-ink-800/60',
+  };
+  const sizes = { sm:'px-3 py-1.5 text-[12px]', md:'px-4 py-2.5 text-[13px]', lg:'px-5 py-3 text-[14px]' };
+  return (
+    <button onClick={onClick}
+      className={`inline-flex items-center justify-center gap-2 rounded-md font-medium tracking-tight border bg-transparent transition-all duration-200 active:scale-[.98] ${palette[color]} ${sizes[size]} ${className}`}>
+      {icon}{children}
+    </button>
+  );
+}
+
+const Icon = {
+  upload:   p => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" {...p}><path d="M12 16V4M12 4l-5 5M12 4l5 5M4 18v2h16v-2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  check:    p => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" {...p}><path d="M5 12.5 L10 17 L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  x:        p => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" {...p}><path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>,
+  copy:     p => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" {...p}><rect x="8" y="8" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M5 16V6a1 1 0 0 1 1-1h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
+  download: p => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" {...p}><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  bolt:     p => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" {...p}><path d="M13 2 L4 14 L11 14 L11 22 L20 10 L13 10 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>,
+  warn:     p => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" {...p}><path d="M12 3 L22 20 H2 Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/><path d="M12 10v4M12 17v.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
+  chev:     p => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" {...p}><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  play:     p => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" {...p}><path d="M6 4 L20 12 L6 20 Z" fill="currentColor"/></svg>,
+  refresh:  p => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" {...p}><path d="M4 12a8 8 0 0 1 14-5.3M20 4v5h-5M20 12a8 8 0 0 1-14 5.3M4 20v-5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  spark:    p => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" {...p}><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
+};
+</script>
+
+<script type="text/babel">
+// ── views 1–4 ─────────────────────────────────────────────────────────────────
+const { motion: M, AnimatePresence: AP } = window.framerMotion || window.Motion || {};
+const fadeUp = {
+  initial:{ opacity:0, y:14 }, animate:{ opacity:1, y:0 }, exit:{ opacity:0, y:-8 },
+  transition:{ duration:.45, ease:[.2,.7,.2,1] },
+};
+
+function UploadPanel({ onStart }) {
+  const [drag, setDrag] = useState(false);
+  const [file, setFile] = useState(null);
+  const [desc, setDesc] = useState("Predict 30-day customer churn for our SaaS subscribers. The target column is `churned` (boolean). We care most about catching at-risk users early so optimize for recall on the positive class.");
+  useEffect(() => { setFile({ name:'subscriber_events_q1.csv', size:1843204, rows:12847 }); }, []);
+  const canStart = file && desc.trim().length > 20;
+  return (
+    <M.div {...fadeUp} className="max-w-[860px] w-full mx-auto px-8 py-6">
+      <SectionTitle index="01" title="New ML Job" subtitle="Drop a CSV, describe the problem in plain English. Prometheus picks the task, splits the data, and trains contender models autonomously."/>
+      <div className="grid gap-5">
+        <M.div {...fadeUp} transition={{...fadeUp.transition,delay:.05}}>
+          <label onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)}
+            onDrop={e=>{e.preventDefault();setDrag(false);const f=e.dataTransfer.files?.[0];if(f)setFile({name:f.name,size:f.size,rows:12847});}}
+            className={`dropzone ${drag?'dragging':''} rounded-xl block px-7 py-7 cursor-pointer bg-ink-900/40`}>
+            <div className="flex items-center gap-5">
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${drag?'bg-accent-blue/15 text-accent-blueGlow':'bg-ink-800 text-ink-300'}`}>
+                <Icon.upload width="22" height="22"/>
+              </div>
+              <div className="flex-1">
+                {file ? (
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <div className="font-mono text-[13px] text-ink-100">{file.name}</div>
+                      <span className="px-2 py-0.5 rounded bg-accent-emerald/10 border border-accent-emerald/30 text-accent-emerald text-[10px] font-mono uppercase tracking-wider">ready</span>
+                    </div>
+                    <div className="text-[12px] text-ink-400 mt-1 font-mono">{(file.size/1024).toFixed(1)} KB · {file.rows.toLocaleString()} rows · 18 columns</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-[14px] text-ink-100 font-medium">Drop CSV here or click to browse</div>
+                    <div className="text-[12px] text-ink-400 mt-1">Up to 500 MB · UTF-8 · header row required</div>
+                  </div>
+                )}
+              </div>
+              {file && <button onClick={e=>{e.preventDefault();setFile(null);}} className="text-ink-500 hover:text-ink-200 p-1.5"><Icon.x/></button>}
+            </div>
+          </label>
+        </M.div>
+        <M.div {...fadeUp} transition={{...fadeUp.transition,delay:.1}}>
+          <div className="flex items-center justify-between mb-2">
+            <label className="eyebrow">Problem description</label>
+            <span className="font-mono text-[11px] text-ink-500">{desc.length} / 800</span>
+          </div>
+          <textarea value={desc} onChange={e=>setDesc(e.target.value.slice(0,800))} rows={5}
+            placeholder="What are you trying to predict? Which column is the target? Any constraints…"
+            className="w-full bg-ink-900/60 border border-ink-700 rounded-lg px-4 py-3 text-[13.5px] text-ink-100 placeholder-ink-500 resize-none font-sans leading-relaxed"/>
+        </M.div>
+        <M.div {...fadeUp} transition={{...fadeUp.transition,delay:.15}} className="rounded-lg bg-ink-900/40 border border-ink-700/60 px-5 py-4">
+          <div className="eyebrow mb-3">Pipeline · 6 steps</div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {['Analyze CSV','Profile data','Approve plan','Run experiments','Select model','Generate endpoint'].map((s,i)=>(
+              <React.Fragment key={s}>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-ink-800/60 border border-ink-700/60">
+                  <span className="font-mono text-[10px] text-ink-500">0{i+1}</span>
+                  <span className="text-[11.5px] text-ink-200">{s}</span>
+                </div>
+                {i<5 && <span className="text-ink-600">→</span>}
+              </React.Fragment>
+            ))}
+          </div>
+        </M.div>
+        <M.div {...fadeUp} transition={{...fadeUp.transition,delay:.2}} className="flex items-center justify-between pt-1">
+          <div className="text-[12px] text-ink-400">Estimated <span className="text-ink-200 font-mono">8–14 min</span> for this dataset size</div>
+          <PrimaryButton color="blue" size="lg" onClick={()=>onStart?.({file,desc})} disabled={!canStart} icon={<Icon.bolt/>}>Start Pipeline</PrimaryButton>
+        </M.div>
+      </div>
+    </M.div>
+  );
+}
+
+function ApprovalGate({ onApprove, onReject }) {
+  const [taskType, setTaskType] = useState('Binary Classification');
+  const [target, setTarget] = useState('churned');
+  const [metric, setMetric] = useState('ROC-AUC');
+  const warnings = [
+    { id:'leak', title:'Possible target leakage', detail:'Column `last_session_at` was logged AFTER label assignment. Will be excluded from training.' },
+    { id:'imb',  title:'Class imbalance: 87 / 13', detail:'Stratified sampling and class-weighted loss will be applied.' },
+  ];
+  const Field = ({ label, value, onChange, options, mono }) => (
+    <div className="flex items-center justify-between py-3 border-b border-ink-800 last:border-b-0">
+      <div className="eyebrow">{label}</div>
+      {options ? (
+        <select value={value} onChange={e=>onChange(e.target.value)} className="bg-ink-850 border border-ink-700 rounded-md px-3 py-1.5 text-[12.5px] text-ink-100 hover:border-accent-blue/40 transition-colors">
+          {options.map(o=><option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input value={value} onChange={e=>onChange(e.target.value)} className={`bg-ink-850 border border-ink-700 rounded-md px-3 py-1.5 text-[12.5px] text-right hover:border-accent-blue/40 transition-colors ${mono?'font-mono text-accent-blueGlow':'text-ink-100'}`}/>
+      )}
+    </div>
+  );
+  return (
+    <M.div {...fadeUp} className="max-w-[860px] w-full mx-auto px-8 py-6">
+      <SectionTitle index="02" title="Confirm the plan" subtitle="Prometheus inferred this from your description and dataset. Review and edit before training kicks off." right={<StatusBadge status="pending"/>}/>
+      <M.div {...fadeUp} transition={{...fadeUp.transition,delay:.05}} className="glass-strong rounded-xl p-1">
+        <div className="px-5 pt-2">
+          <Field label="Task Type" value={taskType} onChange={setTaskType} options={['Binary Classification','Multiclass Classification','Regression','Time-series Forecast']}/>
+          <Field label="Target Column" value={target} onChange={setTarget} mono/>
+          <Field label="Evaluation Metric" value={metric} onChange={setMetric} options={['ROC-AUC','F1','PR-AUC','Accuracy','Log-loss']}/>
+          <Field label="Validation Strategy" value="Stratified 5-fold CV" onChange={()=>{}} options={['Stratified 5-fold CV','Hold-out 80/20','Time-aware split']}/>
+        </div>
+        <div className="px-5 pt-3 pb-5">
+          <div className="eyebrow mb-3">Detected issues</div>
+          <div className="grid gap-2">
+            {warnings.map((w,i)=>(
+              <M.div key={w.id} {...fadeUp} transition={{...fadeUp.transition,delay:.1+i*.05}}
+                className="flex items-start gap-3 rounded-lg px-3.5 py-3 bg-accent-amber/8 border border-accent-amber/25">
+                <div className="text-accent-amber mt-0.5"><Icon.warn/></div>
+                <div className="flex-1">
+                  <div className="text-[12.5px] text-accent-amber font-medium">{w.title}</div>
+                  <div className="text-[12px] text-ink-300 mt-0.5">{w.detail}</div>
+                </div>
+              </M.div>
+            ))}
+          </div>
+        </div>
+      </M.div>
+      <div className="flex items-center justify-between mt-6">
+        <div className="text-[12px] text-ink-400">You can <span className="text-ink-200">adjust any field</span> above before approval.</div>
+        <div className="flex items-center gap-3">
+          <OutlineButton color="rose" onClick={onReject} icon={<Icon.x/>}>Reject</OutlineButton>
+          <PrimaryButton color="emerald" onClick={onApprove} icon={<Icon.check/>}>Approve &amp; Train</PrimaryButton>
+        </div>
+      </div>
+    </M.div>
+  );
+}
+
+function DataWaterfall() {
+  const rows = useMemo(() => {
+    const samples = [
+      'user_id=8af2,age=34,plan=pro,sessions=18,last_seen=2025-04-12,churned=0',
+      'user_id=2c1e,age=52,plan=free,sessions=4,last_seen=2025-04-09,churned=1',
+      'user_id=ff04,age=29,plan=pro,sessions=42,last_seen=2025-04-14,churned=0',
+      'user_id=91ab,age=41,plan=team,sessions=11,last_seen=2025-04-10,churned=0',
+      'user_id=7720,age=23,plan=free,sessions=2,last_seen=2025-03-30,churned=1',
+      'user_id=da55,age=38,plan=pro,sessions=27,last_seen=2025-04-13,churned=0',
+      'user_id=4f12,age=47,plan=team,sessions=9,last_seen=2025-04-11,churned=0',
+    ];
+    return Array.from({length:22}).map((_,i)=>({ key:i, text:samples[i%samples.length], top:Math.random()*100, dur:6+Math.random()*4, delay:-Math.random()*8, left:Math.random()*100 }));
+  }, []);
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {rows.map(r=>(
+        <div key={r.key} className="waterfall-row"
+          style={{ top:`${r.top}%`, left:`${r.left*.4}%`, animationDuration:`${r.dur}s`, animationDelay:`${r.delay}s` }}>
+          {r.text}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NetworkGraph() {
+  const nodes = useMemo(() => {
+    const arr = [], layers = [3,5,7,5,3]; let idx=0;
+    layers.forEach((n,li) => { for(let i=0;i<n;i++){arr.push({id:`${li}-${i}`,x:80+li*110,y:60+(i+1)*(300/(n+1)),layer:li,delay:idx*.06});idx++;} });
+    return arr;
+  }, []);
+  const edges = useMemo(() => {
+    const e=[], byLayer={};
+    nodes.forEach(n=>{(byLayer[n.layer]||=[]).push(n);});
+    Object.keys(byLayer).forEach(li=>{const next=byLayer[+li+1];if(!next)return;byLayer[li].forEach(a=>next.forEach(b=>{if(Math.random()<.55)e.push({a,b,delay:Math.max(a.delay,b.delay)+.1});}));});
+    return e;
+  }, [nodes]);
+  return (
+    <svg viewBox="0 0 600 360" className="w-full h-full">
+      <defs><radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#3B82F6" stopOpacity=".9"/><stop offset="100%" stopColor="#3B82F6" stopOpacity="0"/></radialGradient></defs>
+      {edges.map((e,i)=>(
+        <M.line key={i} x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y}
+          stroke="rgba(96,165,250,.35)" strokeWidth=".75"
+          initial={{pathLength:0,opacity:0}} animate={{pathLength:1,opacity:1}}
+          transition={{duration:.8,delay:e.delay,ease:'easeInOut'}}/>
+      ))}
+      {nodes.map(n=>(
+        <M.g key={n.id} initial={{opacity:0,scale:0}} animate={{opacity:1,scale:1}} transition={{duration:.45,delay:n.delay,ease:'backOut'}}>
+          <circle cx={n.x} cy={n.y} r="14" fill="url(#nodeGlow)"/>
+          <circle cx={n.x} cy={n.y} r="4.5" fill="#60A5FA"/>
+          <circle cx={n.x} cy={n.y} r="2" fill="white"/>
+        </M.g>
+      ))}
+    </svg>
+  );
+}
+
+function DataProfileView() {
+  const messages = ['Scanning 18 columns across 12,847 rows…','Detecting distributions and dtypes…','Computing pairwise correlations…','Checking for target leakage…','Estimating feature importance baseline…','Profiling complete. Preparing experiments…'];
+  const [msgIdx, setMsgIdx] = useState(0);
+  const [eta, setEta] = useState(38);
+  useEffect(() => {
+    const i = setInterval(()=>setMsgIdx(v=>(v+1)%messages.length), 1800);
+    const t = setInterval(()=>setEta(v=>Math.max(2,v-1)), 1000);
+    return ()=>{clearInterval(i);clearInterval(t);};
+  }, []);
+  const columns = [
+    {name:'plan',       type:'categorical',missing:0,  pct:92},
+    {name:'sessions',   type:'int',        missing:12, pct:78},
+    {name:'age',        type:'int',        missing:4,  pct:88},
+    {name:'tenure_days',type:'int',        missing:0,  pct:95},
+    {name:'plan_price', type:'float',      missing:0,  pct:80},
+    {name:'support_qs', type:'int',        missing:31, pct:64},
+    {name:'last_session',type:'datetime',  missing:8,  pct:18,warn:'leak'},
+  ];
+  return (
+    <M.div {...fadeUp} className="max-w-[1180px] w-full mx-auto px-8 py-6">
+      <SectionTitle index="03" title="Profiling data" subtitle="Reading the CSV, characterising each column, and assembling a feature graph."
+        right={<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-blue/10 border border-accent-blue/30 text-accent-blueGlow"><span className="dot bg-accent-blueGlow pulse-dot"/><span className="text-[11px] font-mono">ETA ~{eta}s</span></div>}/>
+      <div className="grid grid-cols-12 gap-5">
+        <M.div {...fadeUp} transition={{...fadeUp.transition,delay:.05}} className="col-span-12 lg:col-span-7 glass-strong rounded-xl overflow-hidden relative" style={{height:420}}>
+          <div className="absolute inset-0 bg-grid-fine opacity-40"/>
+          <div className="absolute inset-0"><DataWaterfall/></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-ink-900/30 via-transparent to-ink-900/80"/>
+          <div className="absolute inset-0 flex items-center justify-center"><NetworkGraph/></div>
+          <div className="absolute inset-x-0 bottom-0 px-5 py-4">
+            <AP mode="wait">
+              <M.div key={msgIdx} initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={{duration:.25}}
+                className="font-mono text-[12.5px] text-accent-blueGlow flex items-center gap-2">
+                <span className="dot bg-accent-blueGlow pulse-dot"/>{messages[msgIdx]}
+              </M.div>
+            </AP>
+          </div>
+        </M.div>
+        <M.div {...fadeUp} transition={{...fadeUp.transition,delay:.1}} className="col-span-12 lg:col-span-5 glass-strong rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="eyebrow">Column profiles</div>
+            <div className="font-mono text-[11px] text-ink-500">18 cols · 12,847 rows</div>
+          </div>
+          <div className="space-y-3">
+            {columns.map((c,i)=>(
+              <M.div key={c.name} initial={{opacity:0,x:8}} animate={{opacity:1,x:0}} transition={{duration:.35,delay:.1+i*.06}}>
+                <div className="flex items-center justify-between text-[12px] mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-ink-100">{c.name}</span>
+                    <span className="font-mono text-[10px] text-ink-500">{c.type}</span>
+                    {c.warn && <span className="px-1.5 py-0.5 rounded bg-accent-amber/10 border border-accent-amber/30 text-accent-amber font-mono text-[9.5px] uppercase">{c.warn}</span>}
+                  </div>
+                  <div className="font-mono text-ink-400 text-[11px]">{c.missing>0?<span className="text-accent-amber">{c.missing} null</span>:'clean'}</div>
+                </div>
+                <div className="h-1.5 rounded-full bg-ink-800 overflow-hidden">
+                  <M.div initial={{width:0}} animate={{width:`${c.pct}%`}} transition={{duration:.8,delay:.2+i*.06,ease:[.2,.7,.2,1]}}
+                    className="h-full" style={{background:c.warn?'linear-gradient(90deg,#F59E0B,#FBBF24)':'linear-gradient(90deg,#3B82F6,#10B981)'}}/>
+                </div>
+              </M.div>
+            ))}
+          </div>
+        </M.div>
+      </div>
+    </M.div>
+  );
+}
+
+const LOG_LINES_A = [
+  {kind:'info',text:'$ python train.py --arch gradient_boost --seed 42'},
+  {kind:'log', text:'[loader] reading subscriber_events_q1.csv (12,847 rows × 18 cols)'},
+  {kind:'log', text:'[loader] dropping `last_session_at` (target leakage)'},
+  {kind:'log', text:'[encoder] one-hot: plan, region, signup_source → +24 features'},
+  {kind:'log', text:'[split] stratified 5-fold, seed=42, pos_class=0.13'},
+  {kind:'log', text:'[model] LightGBMClassifier(n_estimators=400, lr=0.05)'},
+  {kind:'log', text:'[fold 1/5] training… eval_logloss=0.371  auc=0.831'},
+  {kind:'log', text:'[fold 2/5] training… eval_logloss=0.366  auc=0.846'},
+  {kind:'log', text:'[fold 3/5] training… eval_logloss=0.359  auc=0.851'},
+  {kind:'log', text:'[fold 4/5] training… eval_logloss=0.362  auc=0.844'},
+  {kind:'log', text:'[fold 5/5] training… eval_logloss=0.358  auc=0.857'},
+  {kind:'ok',  text:'[oof] roc_auc=0.8462  pr_auc=0.612  brier=0.094'},
+  {kind:'log', text:'[shap] computing global importance…'},
+  {kind:'ok',  text:'[done] artifacts → /runs/exp_a/model.pkl'},
+];
+const LOG_LINES_B = [
+  {kind:'info',text:'$ python train.py --arch logistic_l2 --seed 42'},
+  {kind:'log', text:'[loader] reading subscriber_events_q1.csv (12,847 rows × 18 cols)'},
+  {kind:'log', text:'[encoder] target-encode high-cardinality categoricals'},
+  {kind:'log', text:'[scaler] StandardScaler on numeric features'},
+  {kind:'log', text:'[model] LogisticRegression(penalty=l2, C=0.8)'},
+  {kind:'warn',text:'[fold 1/5] convergence warning: increasing max_iter → 2000'},
+  {kind:'err', text:'[fold 2/5] ValueError: input contains NaN at col `support_qs`'},
+  {kind:'warn',text:'[autofix] retry #1 → imputing `support_qs` with median'},
+  {kind:'log', text:'[fold 2/5] training… eval_logloss=0.412  auc=0.778'},
+  {kind:'err', text:'[fold 3/5] LinAlgError: singular matrix after one-hot'},
+  {kind:'warn',text:'[autofix] retry #2 → dropping collinear pair (plan_pro, plan_pro_old)'},
+  {kind:'log', text:'[fold 3/5] training… eval_logloss=0.408  auc=0.781'},
+  {kind:'log', text:'[fold 4/5] training… eval_logloss=0.405  auc=0.788'},
+  {kind:'log', text:'[fold 5/5] training… eval_logloss=0.407  auc=0.784'},
+  {kind:'ok',  text:'[oof] roc_auc=0.7842  pr_auc=0.510  brier=0.108'},
+  {kind:'ok',  text:'[done] artifacts → /runs/exp_b/model.pkl'},
+];
+
+function useStreamingLog(allLines, intervalMs=700, running=true) {
+  const [count, setCount] = useState(1);
+  useEffect(() => {
+    if (!running || count >= allLines.length) return;
+    const t = setTimeout(()=>setCount(c=>Math.min(allLines.length,c+1)), intervalMs);
+    return ()=>clearTimeout(t);
+  }, [count, allLines.length, running, intervalMs]);
+  return allLines.slice(0, count);
+}
+
+function LiveTimer() {
+  const [s, setS] = useState(0);
+  useEffect(()=>{ const t=setInterval(()=>setS(v=>v+1),1000); return()=>clearInterval(t); },[]);
+  return <span>{String(Math.floor(s/60)).padStart(2,'0')}:{String(s%60).padStart(2,'0')}</span>;
+}
+
+function Sparkline({ data, color, label }) {
+  const w=140, h=36, max=Math.max(...data), min=Math.min(...data);
+  const pts = data.map((v,i)=>`${(i/(data.length-1))*w},${h-((v-min)/(max-min||1))*h}`).join(' ');
+  return (
+    <div className="flex items-center gap-3">
+      <span className="font-mono text-[11px] text-ink-400">{label}</span>
+      <svg width={w} height={h}>
+        <polyline points={pts} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        {data.map((v,i)=>{ const x=(i/(data.length-1))*w, y=h-((v-min)/(max-min||1))*h; return <circle key={i} cx={x} cy={y} r="1.5" fill={color}/>; })}
+      </svg>
+      <span className="font-mono text-[11px]" style={{color}}>{data[data.length-1].toFixed(3)}</span>
+    </div>
+  );
+}
+
+function ExperimentCard({ name, arch, accent, status, retries, score, lines, completed, isWinner, idx }) {
+  const accentClass = accent==='emerald'?'accent-emerald':'accent-blue';
+  const winnerStyle = isWinner ? { boxShadow:'0 0 0 1px rgba(251,191,36,.6), 0 0 40px -6px rgba(251,191,36,.45)' } : {};
+  return (
+    <M.div initial={{opacity:0,y:16}} animate={{opacity:1,y:isWinner?-8:(completed&&!isWinner?4:0),scale:isWinner?1.015:(completed&&!isWinner?.985:1)}}
+      transition={{duration:.5,delay:idx*.08,ease:[.2,.7,.2,1]}} style={winnerStyle}
+      className={`glass-strong rounded-xl p-5 relative overflow-hidden card-lift ${completed&&!isWinner?'opacity-70':''}`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className={`w-1.5 h-7 rounded-full bg-${accentClass}`}/>
+          <div>
+            <div className="text-[15px] font-semibold tracking-tight">{name}</div>
+            <div className="font-mono text-[11px] text-ink-400 mt-0.5">{arch}</div>
+          </div>
+        </div>
+        <StatusBadge status={status}/>
+      </div>
+      <TerminalLog lines={lines} running={status==='running'||status==='retrying'} accent={accent} height={210}/>
+      <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center gap-4">
+          <CircularProgress value={retries} total={3} color={status==='retrying'?'#F59E0B':status==='failed'?'#F43F5E':(accent==='emerald'?'#10B981':'#3B82F6')} label="retries"/>
+          <div>
+            <div className="eyebrow">elapsed</div>
+            <div className="font-mono text-[13px] text-ink-100 mt-0.5">{status==='running'?<LiveTimer/>:'00:42'}</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="eyebrow">ROC-AUC</div>
+          <div className={`font-mono font-semibold text-[28px] leading-none mt-1 ${completed?(accent==='emerald'?'text-accent-emerald':'text-accent-blueGlow'):'text-ink-500'}`}>
+            {completed?<CountUp to={score} duration={1.2} decimals={4}/>:'—.——'}
+          </div>
+          {completed && (
+            <M.div initial={{opacity:0,y:4}} animate={{opacity:1,y:0}} transition={{delay:1.0}} className="text-[10.5px] font-mono text-ink-400 mt-1">
+              pr-auc 0.{Math.round(score*700)} · brier 0.0{Math.round((1-score)*9)}
+            </M.div>
+          )}
+        </div>
+      </div>
+      {isWinner && (
+        <M.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:.3}} className="absolute top-4 right-4">
+          <div className="px-2 py-0.5 rounded-full bg-accent-gold/15 border border-accent-gold/50 text-accent-gold text-[10px] font-mono uppercase tracking-widest font-semibold">★ Leader</div>
+        </M.div>
+      )}
+    </M.div>
+  );
+}
+
+function ExperimentRaceView({ phase='racing' }) {
+  const linesA = useStreamingLog(LOG_LINES_A, 700, phase==='racing');
+  const linesB = useStreamingLog(LOG_LINES_B, 800, phase==='racing');
+  const statusA = phase==='finished'||linesA.length>=LOG_LINES_A.length?'success':'running';
+  const lastB = linesB[linesB.length-1];
+  const statusB = phase==='finished'||linesB.length>=LOG_LINES_B.length?'success':lastB?.kind==='warn'?'retrying':'running';
+  const retriesB = linesB.filter(l=>l.text.includes('autofix')).length;
+  const completedA = phase==='finished'||linesA.length>=LOG_LINES_A.length;
+  const completedB = phase==='finished'||linesB.length>=LOG_LINES_B.length;
+  return (
+    <M.div {...fadeUp} className="max-w-[1280px] w-full mx-auto px-8 py-6">
+      <SectionTitle index="04" title="Experiments running" subtitle="Two architectures racing on the same validation folds. Autofix kicks in on failure — up to 3 retries each."
+        right={<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink-800/60 border border-ink-700"><span className="dot bg-accent-blue pulse-dot"/><span className="font-mono text-[11px] text-ink-200">2 active</span></div>}/>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <ExperimentCard idx={0} name="Experiment A" arch="lightgbm · gradient boosted trees" accent="emerald" status={statusA} retries={0} score={0.8462} lines={linesA} completed={completedA} isWinner={completedA&&completedB}/>
+        <ExperimentCard idx={1} name="Experiment B" arch="logistic regression · l2 penalty" accent="blue" status={statusB} retries={retriesB} score={0.7842} lines={linesB} completed={completedB} isWinner={false}/>
+      </div>
+      <M.div {...fadeUp} transition={{...fadeUp.transition,delay:.25}} className="glass-strong rounded-xl mt-5 px-5 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div><div className="eyebrow">Leaderboard</div><div className="text-[13px] text-ink-100 mt-1">Live ROC-AUC across folds</div></div>
+            <div className="h-10 w-px bg-ink-700"/>
+            <Sparkline data={[.52,.61,.68,.74,.79,.82,.835,.846]} color="#10B981" label="A"/>
+            <Sparkline data={[.50,.55,.60,.66,.71,.74,.77,.784]} color="#3B82F6" label="B"/>
+          </div>
+          <div className="text-right"><div className="eyebrow">delta</div><div className="font-mono text-[18px] text-accent-emerald font-semibold mt-1">+0.062</div></div>
+        </div>
+      </M.div>
+    </M.div>
+  );
+}
+</script>
+
+<script type="text/babel">
+// ── views 5–7 ─────────────────────────────────────────────────────────────────
+const { motion: M2, AnimatePresence: AP2 } = window.framerMotion || window.Motion || {};
+const fadeUp2 = { initial:{opacity:0,y:14}, animate:{opacity:1,y:0}, exit:{opacity:0,y:-8}, transition:{duration:.45,ease:[.2,.7,.2,1]} };
+
+function TypeIn({ text, speed=18, delay=0, onDone }) {
+  const [out, setOut] = useState('');
+  useEffect(() => {
+    let i=0, start;
+    const startT = setTimeout(()=>{ start=setInterval(()=>{ i++; setOut(text.slice(0,i)); if(i>=text.length){clearInterval(start);onDone?.();} }, speed); }, delay);
+    return()=>{clearTimeout(startT);clearInterval(start);};
+  }, [text]);
+  return <span>{out}<span className="blink inline-block w-1.5 h-3.5 bg-accent-emerald align-middle ml-0.5"/></span>;
+}
+
+function ModelSelectionView({ onApprove }) {
+  const [showConfetti, setShowConfetti] = useState(false);
+  useEffect(()=>{ const t=setTimeout(()=>setShowConfetti(true),350); return()=>clearTimeout(t); },[]);
+  return (
+    <M2.div {...fadeUp2} className="max-w-[1180px] w-full mx-auto px-8 py-6 relative">
+      <Confetti trigger={showConfetti}/>
+      <SectionTitle index="05" title="Model selected" subtitle="Prometheus picked the winner. Approve to generate the inference endpoint and packaged artifacts."
+        right={<M2.div initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}} transition={{delay:.15}}><div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-gold/10 border border-accent-gold/40 text-accent-gold"><Icon.spark/><span className="text-[11px] font-mono uppercase tracking-widest">selected</span></div></M2.div>}/>
+      <div className="grid grid-cols-12 gap-5">
+        <M2.div initial={{opacity:0,y:20}} animate={{opacity:1,y:-6}} transition={{duration:.55,ease:[.2,.7,.2,1]}}
+          className="col-span-12 lg:col-span-8 glass-strong rounded-2xl p-6 relative"
+          style={{boxShadow:'0 0 0 1px rgba(251,191,36,.6), 0 0 48px -6px rgba(251,191,36,.5)'}}>
+          <div className="flex items-start justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-accent-gold/15 border border-accent-gold/40 flex items-center justify-center text-accent-gold"><Icon.spark width="22" height="22"/></div>
+              <div><div className="text-[20px] font-semibold tracking-tight">Experiment A</div><div className="font-mono text-[12px] text-ink-400 mt-0.5">lightgbm · gradient boosted trees</div></div>
+            </div>
+            <div className="text-right"><div className="eyebrow">ROC-AUC</div><div className="font-mono font-semibold text-[40px] leading-none text-accent-emerald mt-1.5"><CountUp to={0.8462} duration={1.5} decimals={4}/></div></div>
+          </div>
+          <div className="grid grid-cols-4 gap-3 mb-5">
+            {[{label:'PR-AUC',value:'0.612'},{label:'Brier',value:'0.094'},{label:'F1 @ 0.35',value:'0.679'},{label:'Recall',value:'0.742'}].map((m,i)=>(
+              <M2.div key={m.label} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.35,delay:.3+i*.05}}
+                className="rounded-lg bg-ink-900/60 border border-ink-700/60 px-3 py-2.5">
+                <div className="eyebrow text-[9px]">{m.label}</div>
+                <div className="font-mono text-[15px] text-ink-100 mt-1">{m.value}</div>
+              </M2.div>
+            ))}
+          </div>
+          <div className="rounded-lg bg-accent-emerald/5 border border-accent-emerald/25 px-4 py-3.5">
+            <div className="flex items-center gap-2 mb-2"><span className="dot bg-accent-emerald"/><div className="eyebrow text-accent-emerald">Justification</div></div>
+            <div className="text-[13px] text-ink-200 leading-relaxed font-mono">
+              <TypeIn text='Experiment A wins on ROC-AUC by +0.062 with lower variance across folds (σ=0.011 vs 0.024). Gradient-boosted trees handle the categorical-heavy feature set without manual encoding and remained robust through all 5 CV splits. No autofix retries required.' speed={14} delay={500}/>
+            </div>
+          </div>
+        </M2.div>
+        <M2.div initial={{opacity:0,y:20}} animate={{opacity:.55,y:4,scale:.97}} transition={{duration:.55,delay:.1,ease:[.2,.7,.2,1]}}
+          className="col-span-12 lg:col-span-4 rounded-2xl p-5 bg-ink-900/40 border border-ink-700/60 relative">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-ink-800 border border-ink-700 flex items-center justify-center text-ink-500"><Icon.x/></div>
+            <div><div className="text-[15px] font-medium text-ink-300">Experiment B</div><div className="font-mono text-[11px] text-ink-500 mt-0.5">logistic · l2</div></div>
+          </div>
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">ROC-AUC</span><span className="font-mono text-[15px] text-ink-400">0.7842</span></div>
+            <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">retries</span><span className="font-mono text-[15px] text-accent-amber">2 / 3</span></div>
+            <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">verdict</span><span className="text-[11px] text-ink-500">underperformed</span></div>
+          </div>
+          <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-ink-800 border border-ink-700 text-ink-500 text-[10px] font-mono uppercase tracking-widest">archived</div>
+        </M2.div>
+      </div>
+      <M2.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:1.6}} className="flex items-center justify-between mt-6">
+        <div className="text-[12px] text-ink-400">Approving will package <span className="font-mono text-ink-200">model.pkl</span>, generate <span className="font-mono text-ink-200">endpoint.py</span>, and prepare deployment steps.</div>
+        <PrimaryButton color="emerald" size="lg" onClick={onApprove} icon={<Icon.bolt/>}>Approve &amp; Generate Endpoint</PrimaryButton>
+      </M2.div>
+    </M2.div>
+  );
+}
+
+function TestModelPanel() {
+  const [inputs, setInputs] = useState({ plan:'pro', age:'34', sessions:'18', tenure_days:'128', plan_price:'29', support_qs:'2', region:'NA', signup_source:'organic', last_payment_days:'14' });
+  const [result, setResult] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [ripple, setRipple] = useState(null);
+  const fields = [
+    {key:'plan',label:'Plan',type:'select',options:['free','pro','team']},
+    {key:'age',label:'Age',type:'number'},
+    {key:'sessions',label:'Sessions (30d)',type:'number'},
+    {key:'tenure_days',label:'Tenure (days)',type:'number'},
+    {key:'plan_price',label:'Plan price ($)',type:'number'},
+    {key:'support_qs',label:'Support tickets',type:'number'},
+    {key:'region',label:'Region',type:'select',options:['NA','EU','APAC','LATAM']},
+    {key:'signup_source',label:'Signup source',type:'select',options:['organic','referral','ads','partner']},
+    {key:'last_payment_days',label:'Last payment (d)',type:'number'},
+  ];
+  const runPrediction = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setRipple({x:e.clientX-rect.left,y:e.clientY-rect.top,id:Date.now()});
+    setRunning(true); setResult(null);
+    setTimeout(()=>{
+      setRunning(false);
+      const score = Math.max(.04,Math.min(.96,.5-+inputs.sessions*.012-+inputs.tenure_days*.002++inputs.support_qs*.08+(inputs.plan==='free'?.2:-.05)));
+      setResult({prediction:score>.5?1:0,probability:score,target_column:'churned'});
+    }, 950);
+  };
+  return (
+    <M2.div {...fadeUp2} className="glass-strong rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-accent-blue/15 border border-accent-blue/40 flex items-center justify-center text-accent-blueGlow"><Icon.play/></div>
+          <div><div className="text-[15px] font-semibold tracking-tight">Test the model</div><div className="text-[12px] text-ink-400 mt-0.5">Run a prediction against the live in-memory model</div></div>
+        </div>
+        <span className="font-mono text-[11px] text-ink-500">POST /predict</span>
+      </div>
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        {fields.map(f=>(
+          <div key={f.key}>
+            <label className="eyebrow text-[9px] mb-1.5 block">{f.label}</label>
+            {f.type==='select'?(
+              <select value={inputs[f.key]} onChange={e=>setInputs({...inputs,[f.key]:e.target.value})}
+                className="w-full bg-ink-900/60 border border-ink-700 rounded-md px-2.5 py-2 text-[12.5px] text-ink-100 font-mono hover:border-accent-blue/40 transition-colors">
+                {f.options.map(o=><option key={o} value={o}>{o}</option>)}
+              </select>
+            ):(
+              <input type="number" value={inputs[f.key]} onChange={e=>setInputs({...inputs,[f.key]:e.target.value})}
+                className="w-full bg-ink-900/60 border border-ink-700 rounded-md px-2.5 py-2 text-[12.5px] text-ink-100 font-mono hover:border-accent-blue/40 transition-colors"/>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-between">
+        <button onClick={runPrediction} disabled={running}
+          className="relative overflow-hidden inline-flex items-center justify-center gap-2 rounded-md font-medium tracking-tight border bg-accent-blue hover:bg-accent-blueDim border-accent-blue/40 text-white shadow-glow-blue px-4 py-2.5 text-[13px] transition-all active:scale-[.98]">
+          {running?(<><svg width="14" height="14" viewBox="0 0 24 24" className="spin-slow"><circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,.3)" strokeWidth="2" fill="none"/><path d="M12 3 a 9 9 0 0 1 9 9" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>Predicting…</>):(<><Icon.bolt/> Run Prediction</>)}
+          {ripple && (<M2.span key={ripple.id} initial={{width:0,height:0,opacity:.6}} animate={{width:400,height:400,opacity:0}} transition={{duration:.8,ease:'easeOut'}} onAnimationComplete={()=>setRipple(null)} className="absolute rounded-full bg-white pointer-events-none" style={{left:ripple.x,top:ripple.y,transform:'translate(-50%,-50%)'}}/>)}
+        </button>
+        <span className="font-mono text-[10.5px] text-ink-500">model.pkl · 2.4 MB · v1</span>
+      </div>
+      <AP2 mode="wait">
+        {result && (
+          <M2.div key="result" initial={{opacity:0,scale:.9,y:12}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:.95}} transition={{duration:.5,ease:[.2,.7,.2,1]}}
+            className="mt-5 rounded-xl p-5 relative overflow-hidden"
+            style={{background:result.prediction===1?'linear-gradient(135deg,rgba(244,63,94,.12),rgba(244,63,94,.04))':'linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.04))',border:`1px solid ${result.prediction===1?'rgba(244,63,94,.35)':'rgba(16,185,129,.35)'}`}}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="eyebrow">Prediction · churned</div>
+                <M2.div initial={{scale:0,rotate:-8}} animate={{scale:1,rotate:0}} transition={{type:'spring',stiffness:200,damping:14}}
+                  className={`font-mono font-bold text-[44px] leading-none mt-2 ${result.prediction===1?'text-accent-rose':'text-accent-emerald'}`}>
+                  {result.prediction===1?'WILL CHURN':'WILL STAY'}
+                </M2.div>
+              </div>
+              <div className="text-right">
+                <div className="eyebrow">probability</div>
+                <div className={`font-mono font-semibold text-[28px] mt-1 ${result.prediction===1?'text-accent-rose':'text-accent-emerald'}`}>
+                  <CountUp to={result.probability*100} duration={1.0} decimals={1} suffix="%"/>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-[10.5px] font-mono text-ink-400 mb-1.5"><span>confidence</span><span>{(result.probability*100).toFixed(1)}% / 100%</span></div>
+              <div className="h-2 rounded-full bg-ink-800 overflow-hidden">
+                <M2.div initial={{width:0}} animate={{width:`${result.probability*100}%`}} transition={{duration:1.0,delay:.2,ease:[.2,.7,.2,1]}} className="h-full rounded-full"
+                  style={{background:result.prediction===1?'linear-gradient(90deg,#F43F5E,#FB7185)':'linear-gradient(90deg,#10B981,#34D399)'}}/>
+              </div>
+            </div>
+          </M2.div>
+        )}
+      </AP2>
+    </M2.div>
+  );
+}
+
+function EndpointViewer() {
+  const [tab, setTab] = useState('code');
+  const [copied, setCopied] = useState(false);
+  const tabs = [{id:'code',label:'endpoint.py'},{id:'req',label:'requirements.txt'},{id:'deploy',label:'deployment.md'}];
+  const codeBlocks = {
+    code: [
+      {tokens:[['cmt','# Generated by Prometheus · 2026-05-16T14:23Z']]},
+      {tokens:[['kw','from'],['var',' fastapi '],['kw','import'],['var',' FastAPI, HTTPException']]},
+      {tokens:[['kw','import'],['var',' pickle, pandas '],['kw','as'],['var',' pd']]},
+      {tokens:[['kw','from'],['var',' pydantic '],['kw','import'],['var',' BaseModel']]},
+      {tokens:[['kw','from'],['var',' typing '],['kw','import'],['var',' Optional']]},
+      {tokens:[]},
+      {tokens:[['var','app '],['pun','= '],['fn','FastAPI'],['pun','('],['var','title'],['pun','='],['str','"churn-predictor"'],['pun',')']]},
+      {tokens:[['var','_model '],['pun','= '],['kw','None']]},
+      {tokens:[]},
+      {tokens:[['pun','@'],['fn','app.on_event'],['pun','('],['str','"startup"'],['pun',')']]},
+      {tokens:[['kw','async def'],['fn',' load_model'],['pun','():']]},
+      {tokens:[['kw','    global'],['var',' _model']]},
+      {tokens:[['kw','    with'],['fn',' open'],['pun','('],['str','"model.pkl"'],['pun',', '],['str','"rb"'],['pun',') '],['kw','as'],['var',' f:']]},
+      {tokens:[['var','        save '],['pun','= '],['fn','pickle.load'],['pun','('],['var','f'],['pun',')']]},
+      {tokens:[['var','        _model '],['pun','= '],['var','save'],['pun','['],['str','"model"'],['pun',']']]},
+      {tokens:[]},
+      {tokens:[['pun','@'],['fn','app.post'],['pun','('],['str','"/predict"'],['pun',')']]},
+      {tokens:[['kw','async def'],['fn',' predict'],['pun','('],['var','item'],['pun',': '],['fn','Item'],['pun','):']]},
+      {tokens:[['kw','    return'],['pun',' {'],['str','"prediction"'],['pun',': '],['fn','int'],['pun','('],['var','_model.predict'],['pun','('],['var','df'],['pun',')['],['num','0'],['pun','])}']]},
+    ],
+    req: [
+      {tokens:[['var','fastapi'],['pun','>='],['num','0.110.0']]},
+      {tokens:[['var','uvicorn'],['pun','>='],['num','0.29.0']]},
+      {tokens:[['var','pydantic'],['pun','>='],['num','2.0.0']]},
+      {tokens:[['var','scikit-learn'],['pun','>='],['num','1.3.0']]},
+      {tokens:[['var','xgboost'],['pun','>='],['num','2.0.0']]},
+      {tokens:[['var','lightgbm'],['pun','>='],['num','4.0.0']]},
+      {tokens:[['var','pandas'],['pun','>='],['num','2.0.0']]},
+      {tokens:[['var','numpy'],['pun','>='],['num','1.26.0']]},
+    ],
+    deploy: [
+      {tokens:[['cmt','# Quickstart']]},
+      {tokens:[['pun','$ '],['var','pip install -r requirements.txt']]},
+      {tokens:[['pun','$ '],['var','uvicorn endpoint:app --host 0.0.0.0 --port 8001']]},
+      {tokens:[]},
+      {tokens:[['cmt','# Test prediction']]},
+      {tokens:[['pun','$ '],['var','curl -X POST localhost:8001/predict \\']]},
+      {tokens:[['var','    -H '],['str','"Content-Type: application/json"'],['var',' \\']]},
+      {tokens:[['var','    -d '],['str','\'{"plan":"pro","sessions":18}\'']]},
+      {tokens:[]},
+      {tokens:[['cmt','# sklearn version note']]},
+      {tokens:[['var','pip install '],['str','"scikit-learn>=1.3.0,<2.0.0"'],['var',' --upgrade']]},
+    ],
+  };
+  return (
+    <M2.div {...fadeUp2} transition={{...fadeUp2.transition,delay:.05}} className="glass-strong rounded-2xl overflow-hidden">
+      <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-ink-700/60">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-accent-violet/15 border border-accent-violet/40 flex items-center justify-center text-accent-violet">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 4 L4 12 L8 20 M16 4 L20 12 L16 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </div>
+          <div><div className="text-[15px] font-semibold tracking-tight">Generated endpoint</div><div className="text-[12px] text-ink-400 mt-0.5">FastAPI service · ready to deploy</div></div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={()=>{setCopied(true);setTimeout(()=>setCopied(false),1600);}} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-ink-800 hover:bg-ink-750 border border-ink-700 text-ink-200 text-[12px] transition-colors">
+            {copied?<><Icon.check/> Copied</>:<><Icon.copy/> Copy</>}
+          </button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent-blue/15 hover:bg-accent-blue/25 border border-accent-blue/40 text-accent-blueGlow text-[12px] transition-colors"><Icon.download/> endpoint.py</button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent-emerald/15 hover:bg-accent-emerald/25 border border-accent-emerald/40 text-accent-emerald text-[12px] transition-colors"><Icon.download/> model.pkl</button>
+        </div>
+      </div>
+      <div className="px-6 pt-4 flex items-center gap-1">
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} className={`px-3 py-1.5 rounded-md font-mono text-[12px] transition-all ${tab===t.id?'bg-ink-800 text-ink-100 border border-ink-700':'text-ink-500 hover:text-ink-300 border border-transparent'}`}>{t.label}</button>
+        ))}
+      </div>
+      <div className="px-6 pb-6 pt-3">
+        <div className="rounded-lg bg-[#070A12] border border-ink-700/70 overflow-hidden">
+          <div className="px-4 py-3 font-mono text-[12px] leading-relaxed">
+            {codeBlocks[tab].map((line,i)=>(
+              <div key={i} className="flex">
+                <span className="w-7 text-right shrink-0 text-ink-600 select-none mr-3">{String(i+1).padStart(2,'0')}</span>
+                <div className="flex-1">{line.tokens.length===0?<span>&nbsp;</span>:line.tokens.map(([cls,txt],ti)=><span key={ti} className={`tok-${cls}`}>{txt}</span>)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </M2.div>
+  );
+}
+
+function describeArc(cx,cy,r,startAngle,endAngle) {
+  const polar=(cx,cy,r,deg)=>({x:cx+r*Math.cos(deg*Math.PI/180),y:cy+r*Math.sin(deg*Math.PI/180)});
+  const start=polar(cx,cy,r,startAngle), end=polar(cx,cy,r,endAngle);
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${endAngle-startAngle<=180?0:1} 1 ${end.x} ${end.y}`;
+}
+
+function Gauge({ value, max=1 }) {
+  const pct=value/max, r=70, cx=90, cy=90;
+  const arcLen=270*Math.PI/180*r, filledLen=arcLen*pct;
+  const angle=-135+pct*270;
+  const polar=(cx,cy,r,deg)=>({x:cx+r*Math.cos(deg*Math.PI/180),y:cy+r*Math.sin(deg*Math.PI/180)});
+  const np=polar(cx,cy,r-14,angle);
+  return (
+    <svg width="180" height="120" viewBox="0 0 180 130">
+      <defs><linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#3B82F6"/><stop offset="100%" stopColor="#10B981"/></linearGradient></defs>
+      <path d={describeArc(cx,cy,r,-135,135)} className="gauge-track" strokeWidth="10" fill="none" strokeLinecap="round"/>
+      <M2.path d={describeArc(cx,cy,r,-135,135)} className="gauge-fill" strokeWidth="10" fill="none" strokeLinecap="round"
+        strokeDasharray={`${filledLen} ${arcLen}`} initial={{strokeDasharray:`0 ${arcLen}`}} animate={{strokeDasharray:`${filledLen} ${arcLen}`}} transition={{duration:1.3,ease:[.2,.7,.2,1]}}/>
+      <M2.line x1={cx} y1={cy} x2={np.x} y2={np.y} stroke="#EEF1F7" strokeWidth="2" strokeLinecap="round" initial={{pathLength:0}} animate={{pathLength:1}} transition={{duration:.8,delay:.4}}/>
+      <circle cx={cx} cy={cy} r="5" fill="#EEF1F7"/><circle cx={cx} cy={cy} r="2" fill="#0A0E1A"/>
+      <text x={cx} y={cy+26} textAnchor="middle" fill="#EEF1F7" fontFamily="JetBrains Mono,monospace" fontWeight="600" fontSize="18">{value.toFixed(3)}</text>
+    </svg>
+  );
+}
+
+function AccordionRow({ title, children, defaultOpen=false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-b border-ink-800 last:border-b-0">
+      <button onClick={()=>setOpen(o=>!o)} className="w-full flex items-center justify-between py-3 text-left hover:bg-ink-800/30 px-1 -mx-1 rounded transition-colors">
+        <span className="text-[13px] font-medium text-ink-100">{title}</span>
+        <span className={`text-ink-400 transition-transform ${open?'rotate-180':''}`}><Icon.chev/></span>
+      </button>
+      <AP2 initial={false}>
+        {open && (<M2.div initial={{height:0,opacity:0}} animate={{height:'auto',opacity:1}} exit={{height:0,opacity:0}} transition={{duration:.3}} className="overflow-hidden">
+          <div className="pb-3 pt-1 text-[12.5px] text-ink-300 leading-relaxed">{children}</div>
+        </M2.div>)}
+      </AP2>
+    </div>
+  );
+}
+
+function ModelCard() {
+  return (
+    <M2.div {...fadeUp2} transition={{...fadeUp2.transition,delay:.1}} className="glass-strong rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-accent-emerald/15 border border-accent-emerald/40 flex items-center justify-center text-accent-emerald"><Icon.check/></div>
+          <div><div className="text-[15px] font-semibold tracking-tight">Model card</div><div className="text-[12px] text-ink-400 mt-0.5">Performance, limits, intended use</div></div>
+        </div>
+        <span className="font-mono text-[11px] text-ink-500">v1 · 2026-05-16</span>
+      </div>
+      <div className="grid grid-cols-12 gap-5">
+        <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center bg-ink-900/40 rounded-xl border border-ink-700/60 py-4">
+          <div className="eyebrow mb-1">ROC-AUC</div>
+          <Gauge value={0.8462} max={1.0}/>
+          <div className="text-[11px] text-ink-400 font-mono mt-1">vs baseline 0.50 · target 0.85</div>
+        </div>
+        <div className="col-span-12 md:col-span-7">
+          <AccordionRow title="Performance" defaultOpen>
+            <ul className="space-y-1.5">
+              <li><span className="font-mono text-ink-400">ROC-AUC</span> <span className="font-mono text-ink-100">0.8462</span> · 5-fold stratified CV</li>
+              <li><span className="font-mono text-ink-400">PR-AUC</span> <span className="font-mono text-ink-100">0.612</span> · base rate 0.13</li>
+              <li><span className="font-mono text-ink-400">Brier</span> <span className="font-mono text-ink-100">0.094</span> · well-calibrated</li>
+              <li><span className="font-mono text-ink-400">σ across folds</span> <span className="font-mono text-ink-100">0.011</span></li>
+            </ul>
+          </AccordionRow>
+          <AccordionRow title="Intended use">Identify SaaS subscribers at risk of churning within the next 30 days. Outputs a probability — pair with a downstream policy that thresholds against your team's capacity.</AccordionRow>
+          <AccordionRow title="Limitations">Trained on Q1 2026 data only; performance drift expected after 90 days. The `support_qs` feature has 31 missing values imputed with the median. Not validated on enterprise accounts.</AccordionRow>
+        </div>
+      </div>
+    </M2.div>
+  );
+}
+
+function CompleteView() {
+  return (
+    <M2.div {...fadeUp2} className="max-w-[1280px] w-full mx-auto px-8 py-6">
+      <SectionTitle index="06" title="Pipeline complete" subtitle="Your model is trained, packaged, and ready to call. Test it below or pull the endpoint."
+        right={<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-emerald/10 border border-accent-emerald/40 text-accent-emerald"><Icon.check/><span className="text-[11px] font-mono uppercase tracking-widest">deployed</span></div>}/>
+      <div className="space-y-5"><TestModelPanel/><EndpointViewer/><ModelCard/></div>
+    </M2.div>
+  );
+}
+
+function DebugLog() {
+  const entries = [
+    {phase:'experiment',ts:'14:21:47.221',sev:'err',title:'OOMError in fold 4/5',payload:{arch:'lightgbm',memory_used_gb:7.84,memory_limit_gb:8.0,autofix_action:'reduce_n_estimators_to_400'}},
+    {phase:'experiment',ts:'14:22:03.812',sev:'warn',title:'Autofix retry #1 spawned',payload:{retry:1,change:{n_estimators:400,max_depth:10},expected_memory_gb:4.2}},
+    {phase:'experiment',ts:'14:23:19.044',sev:'err',title:'Convergence failure',payload:{arch:'lightgbm',reason:'no_improvement_after_50_rounds',best_score:0.622}},
+    {phase:'experiment',ts:'14:24:11.330',sev:'err',title:'All retries exhausted',payload:{retries_used:3,final_status:'failed',recommendation:'reduce_feature_set_or_provide_more_memory'}},
+  ];
+  const [open, setOpen] = useState({});
+  return (
+    <div className="rounded-xl bg-ink-900/40 border border-accent-rose/20 overflow-hidden">
+      <div className="px-5 py-3 border-b border-ink-800 flex items-center justify-between">
+        <div className="flex items-center gap-2"><span className="dot bg-accent-rose pulse-dot"/><span className="text-[13px] font-medium text-ink-100">Debug log</span><span className="font-mono text-[11px] text-ink-500">4 entries</span></div>
+        <span className="font-mono text-[11px] text-ink-500">job · prom_8a4f12</span>
+      </div>
+      {entries.map((e,i)=>{
+        const isOpen=open[i];
+        return (
+          <div key={i} className="border-b border-ink-800 last:border-b-0">
+            <button onClick={()=>setOpen({...open,[i]:!isOpen})} className="w-full flex items-center gap-4 px-5 py-3 hover:bg-ink-800/30 transition-colors text-left">
+              <span className={`shrink-0 transition-transform ${isOpen?'rotate-180':''} text-ink-400`}><Icon.chev/></span>
+              <span className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase tracking-wider border ${e.sev==='err'?'bg-accent-rose/10 text-accent-rose border-accent-rose/30':'bg-accent-amber/10 text-accent-amber border-accent-amber/30'}`}>{e.phase}</span>
+              <span className="font-mono text-[11px] text-ink-500 shrink-0 w-24">{e.ts}</span>
+              <span className="text-[12.5px] text-ink-100 flex-1">{e.title}</span>
+            </button>
+            <AP2 initial={false}>
+              {isOpen && (<M2.div initial={{height:0,opacity:0}} animate={{height:'auto',opacity:1}} exit={{height:0,opacity:0}} transition={{duration:.3}} className="overflow-hidden bg-[#070A12]">
+                <pre className="px-12 py-3 font-mono text-[11.5px] text-ink-300 leading-relaxed whitespace-pre-wrap">{JSON.stringify(e.payload,null,2)}</pre>
+              </M2.div>)}
+            </AP2>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FailedView({ onRestart }) {
+  return (
+    <M2.div {...fadeUp2} className="max-w-[1080px] w-full mx-auto px-8 py-6 relative">
+      <div className="absolute inset-x-0 top-0 h-64 -z-10 rounded-3xl" style={{background:'radial-gradient(600px 300px at 50% 0%,rgba(244,63,94,.18),transparent 70%)'}}/>
+      <SectionTitle index="!!" title="Pipeline failed" subtitle="Both experiments exhausted their retries. Inspect the debug log, adjust constraints, and re-run."
+        right={<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-rose/10 border border-accent-rose/40 text-accent-rose"><span className="dot bg-accent-rose pulse-dot"/><span className="text-[11px] font-mono uppercase tracking-widest">failed</span></div>}/>
+      <M2.div {...fadeUp2} transition={{...fadeUp2.transition,delay:.05}} className="flex items-start gap-4 rounded-xl bg-accent-rose/8 border border-accent-rose/30 px-5 py-4 mb-5">
+        <div className="w-10 h-10 rounded-lg bg-accent-rose/15 border border-accent-rose/40 flex items-center justify-center text-accent-rose shrink-0"><Icon.warn width="18" height="18"/></div>
+        <div className="flex-1">
+          <div className="text-[14px] font-semibold text-accent-rose">All experiments failed after 3 retries</div>
+          <div className="text-[12.5px] text-ink-300 mt-1">The training process hit memory limits and convergence issues. Common fixes: reduce the feature set, increase the worker memory tier, or relax the early-stopping patience.</div>
+          <div className="flex items-center gap-2 mt-3">
+            <PrimaryButton color="blue" size="sm" onClick={onRestart} icon={<Icon.refresh/>}>Start New Job</PrimaryButton>
+            <OutlineButton color="ink" size="sm">Open in support</OutlineButton>
+          </div>
+        </div>
+      </M2.div>
+      <M2.div {...fadeUp2} transition={{...fadeUp2.transition,delay:.1}}><DebugLog/></M2.div>
+    </M2.div>
+  );
+}
+</script>
+
+<script type="text/babel">
+// ── app root ──────────────────────────────────────────────────────────────────
+const { motion: MA, AnimatePresence: APA } = window.framerMotion || window.Motion || {};
+
+const TWEAK_DEFAULTS = { view:'experiment', autoplay:false, raceState:'racing', polling:true };
+const VIEW_ORDER = ['upload','approval','profile','experiment','select','complete'];
+
+function ViewStepper({ current, onChange }) {
+  const items = [
+    {id:'upload',label:'Upload'},{id:'approval',label:'Approve'},{id:'profile',label:'Profile'},
+    {id:'experiment',label:'Race',badge:'★'},{id:'select',label:'Select'},{id:'complete',label:'Complete'},
+    {id:'failed',label:'Failed',sep:true},
+  ];
+  return (
+    <div className="absolute left-1/2 bottom-6 -translate-x-1/2 z-30">
+      <div className="flex items-center gap-1 px-2 py-1.5 rounded-full glass-strong backdrop-blur-xl shadow-2xl">
+        {items.map((it,i)=>(
+          <React.Fragment key={it.id}>
+            {it.sep && <span className="w-px h-5 bg-ink-700 mx-1"/>}
+            <button onClick={()=>onChange(it.id)}
+              className={`relative px-3 py-1.5 rounded-full text-[11.5px] font-medium tracking-tight transition-all ${current===it.id?'bg-accent-blue/20 text-accent-blueGlow border border-accent-blue/40':'text-ink-300 hover:text-ink-100 border border-transparent hover:bg-ink-800/60'}`}>
+              <span className="font-mono text-[9.5px] text-ink-500 mr-1.5">{it.id==='failed'?'!!':String(VIEW_ORDER.indexOf(it.id)+1).padStart(2,'0')}</span>
+              {it.label}{it.badge&&<span className="ml-1 text-accent-gold">{it.badge}</span>}
+            </button>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const view = t.view;
+
+  useEffect(()=>{
+    if(!t.autoplay) return;
+    const idx=VIEW_ORDER.indexOf(view);
+    if(idx===-1||idx===VIEW_ORDER.length-1) return;
+    const delays={upload:2200,approval:2800,profile:4500,experiment:6500,select:4500};
+    const timer=setTimeout(()=>setTweak('view',VIEW_ORDER[idx+1]),delays[view]||3000);
+    return()=>clearTimeout(timer);
+  },[view,t.autoplay]);
+
+  const goto = v => setTweak('view', v);
+  const stageIndex = VIEW_TO_STAGE[view] ?? 0;
+  const showChrome = view !== 'upload';
+
+  return (
+    <div className="h-full w-full flex flex-col relative">
+      <div className="absolute inset-0 bg-grid opacity-50 pointer-events-none"/>
+      <TopBar jobId={showChrome?'prom_8a4f12':null} polling={t.polling}/>
+      {showChrome && view!=='failed' && <PipelineProgressBar activeIndex={stageIndex}/>}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
+        <APA mode="wait">
+          <MA.div key={view} initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:.35,ease:[.2,.7,.2,1]}} className="w-full">
+            {view==='upload'     && <UploadPanel       onStart={()=>goto('approval')}/>}
+            {view==='approval'   && <ApprovalGate      onApprove={()=>goto('profile')} onReject={()=>goto('upload')}/>}
+            {view==='profile'    && <DataProfileView/>}
+            {view==='experiment' && <ExperimentRaceView phase={t.raceState}/>}
+            {view==='select'     && <ModelSelectionView onApprove={()=>goto('complete')}/>}
+            {view==='complete'   && <CompleteView/>}
+            {view==='failed'     && <FailedView        onRestart={()=>goto('upload')}/>}
+          </MA.div>
+        </APA>
+      </div>
+      <ViewStepper current={view} onChange={goto}/>
+      <TweaksPanel>
+        <TweakSection label="Navigation"/>
+        <TweakSelect label="View" value={t.view} options={[
+          {label:'01 · Upload',value:'upload'},{label:'02 · Approval Gate',value:'approval'},
+          {label:'03 · Profiling',value:'profile'},{label:'04 · Experiments ★',value:'experiment'},
+          {label:'05 · Selection',value:'select'},{label:'06 · Complete',value:'complete'},
+          {label:'!! · Failed state',value:'failed'},
+        ]} onChange={v=>setTweak('view',v)}/>
+        <TweakToggle label="Autoplay all views" value={t.autoplay} onChange={v=>setTweak('autoplay',v)}/>
+        <TweakSection label="Experiments screen"/>
+        <TweakRadio label="Race state" value={t.raceState} options={['racing','finished']} onChange={v=>setTweak('raceState',v)}/>
+        <TweakSection label="Global"/>
+        <TweakToggle label="Polling indicator" value={t.polling} onChange={v=>setTweak('polling',v)}/>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+</body>
+</html>

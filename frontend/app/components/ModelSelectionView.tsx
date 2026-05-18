@@ -1,0 +1,167 @@
+﻿﻿"use client";
+
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { ExperimentResult } from "@/lib/api";
+
+function CountUp({ to, decimals = 4 }: { to: number; decimals?: number }) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    const start = performance.now();
+    let raf: number;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / 1500);
+      setVal(to * (1 - Math.pow(1 - t, 3)));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [to]);
+  return <span>{val.toFixed(decimals)}</span>;
+}
+
+function TypeIn({ text }: { text: string }) {
+  const [out, setOut] = useState("");
+  useEffect(() => {
+    let i = 0;
+    const t = setTimeout(() => {
+      const id = setInterval(() => { i++; setOut(text.slice(0, i)); if (i >= text.length) clearInterval(id); }, 16);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [text]);
+  return <span>{out}<span className="blink inline-block w-1.5 h-3.5 bg-accent-emerald align-middle ml-0.5" /></span>;
+}
+
+function Confetti() {
+  const pieces = Array.from({ length: 50 }).map((_, i) => ({
+    id: i, x: 30 + Math.random() * 40, dx: (Math.random() - 0.5) * 500,
+    dy: -150 - Math.random() * 250, rot: Math.random() * 720 - 360,
+    color: ["#3B82F6", "#10B981", "#FBBF24", "#8B5CF6", "#F43F5E"][i % 5],
+    circle: Math.random() > 0.5, delay: Math.random() * 0.2,
+  }));
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {pieces.map(p => (
+        <motion.div key={p.id}
+          initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
+          animate={{ x: p.dx, y: p.dy + 400, rotate: p.rot, opacity: 0 }}
+          transition={{ duration: 1.6, delay: p.delay }}
+          style={{ position: "absolute", width: 8, height: 8, left: `${p.x}%`, top: "50%", background: p.color, borderRadius: p.circle ? "50%" : "2px" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function ModelSelectionView({ experiments, jobData, onApprove, loading }: {
+  experiments: ExperimentResult[];
+  jobData: any;
+  onApprove: () => void;
+  loading: boolean;
+}) {
+  const [showConfetti, setShowConfetti] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setShowConfetti(true), 300); return () => clearTimeout(t); }, []);
+
+  const winner = experiments.find(e => e.experiment_id === jobData?.winning_experiment?.experiment_id)
+    ?? experiments.find(e => e.success)
+    ?? experiments[0];
+  const loser = experiments.find(e => e !== winner);
+  const winnerScore = winner ? Object.values(winner.parsed_metrics ?? {})[0] ?? 0 : 0;
+  const loserScore = loser ? Object.values(loser.parsed_metrics ?? {})[0] ?? 0 : 0;
+  const metricName = winner ? Object.keys(winner.parsed_metrics ?? {})[0]?.toUpperCase().replace("_", "-") : "METRIC";
+  const justification = jobData?.winning_justification ?? "Selected based on highest held-out metric score across all validation folds.";
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}
+      className="max-w-[1180px] w-full mx-auto px-8 py-6 relative">
+      {showConfetti && <Confetti />}
+
+      <div className="flex items-end justify-between mb-6">
+        <div>
+          <div className="eyebrow">05 . phase</div>
+          <div className="text-[26px] font-semibold tracking-tight mt-1">Model selected</div>
+          <div className="text-ink-400 text-[13.5px] mt-1.5">Approve to generate the inference endpoint and packaged artifacts.</div>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-gold/10 border border-accent-gold/40 text-accent-gold">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+          <span className="text-[11px] font-mono uppercase tracking-widest">selected</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-5">
+        {/* Winner */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: -6 }} transition={{ duration: 0.55 }}
+          className="col-span-12 lg:col-span-8 glass-strong rounded-2xl p-6 relative"
+          style={{ boxShadow: "0 0 0 1px rgba(251,191,36,.6), 0 0 48px -6px rgba(251,191,36,.5)" }}>
+          <div className="flex items-start justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-accent-gold/15 border border-accent-gold/40 flex items-center justify-center text-accent-gold">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </div>
+              <div>
+                <div className="text-[20px] font-semibold tracking-tight">{winner?.architecture_name ?? "Best model"}</div>
+                <div className="font-mono text-[12px] text-ink-400 mt-0.5">{winner?.architecture_name?.toLowerCase()}</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="eyebrow">{metricName}</div>
+              <div className="font-mono font-semibold text-[40px] leading-none text-accent-emerald mt-1.5">
+                <CountUp to={winnerScore} decimals={4} />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-accent-emerald/5 border border-accent-emerald/25 px-4 py-3.5">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="dot bg-accent-emerald" />
+              <div className="eyebrow text-accent-emerald">Justification</div>
+            </div>
+            <div className="text-[13px] text-ink-200 leading-relaxed font-mono">
+              <TypeIn text={justification} />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Loser */}
+        {loser && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 0.55, y: 4, scale: 0.97 }} transition={{ duration: 0.55, delay: 0.1 }}
+            className="col-span-12 lg:col-span-4 rounded-2xl p-5 bg-ink-900/40 border border-ink-700/60 relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-ink-800 border border-ink-700 flex items-center justify-center text-ink-500">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              </div>
+              <div>
+                <div className="text-[15px] font-medium text-ink-300">{loser.architecture_name}</div>
+                <div className="font-mono text-[11px] text-ink-500 mt-0.5">{loser.architecture_name?.toLowerCase()}</div>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">{metricName}</span><span className="font-mono text-[15px] text-ink-400">{loserScore.toFixed(4)}</span></div>
+              <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">retries</span><span className={`font-mono text-[15px] ${loser.retry_count > 0 ? "text-accent-amber" : "text-ink-400"}`}>{loser.retry_count} / 3</span></div>
+              <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">verdict</span><span className="text-[11px] text-ink-500">underperformed</span></div>
+            </div>
+            <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-ink-800 border border-ink-700 text-ink-500 text-[10px] font-mono uppercase">archived</div>
+          </motion.div>
+        )}
+      </div>
+
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4 }}
+        className="flex items-center justify-between mt-6">
+        <div className="text-[12px] text-ink-400">
+          Approving will package <span className="font-mono text-ink-200">model.pkl</span>, generate <span className="font-mono text-ink-200">endpoint.py</span>, and prepare deployment steps.
+        </div>
+        <button onClick={onApprove} disabled={loading}
+          className="inline-flex items-center gap-2 px-5 py-3 rounded-md font-medium text-[14px] tracking-tight border transition-all active:scale-[.98] disabled:opacity-40 bg-accent-emerald hover:bg-accent-emeraldDim border-accent-emerald/40 text-white shadow-glow-emerald">
+          {loading ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" className="spin-slow"><circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,.3)" strokeWidth="2" fill="none"/><path d="M12 3a9 9 0 0 1 9 9" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14l7 0L11 22 20 10 13 10Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>
+          )}
+          Approve &amp; Generate Endpoint
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+

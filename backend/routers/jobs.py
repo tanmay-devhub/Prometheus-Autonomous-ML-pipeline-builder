@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from sklearn.model_selection import train_test_split
 from fastapi.responses import FileResponse, JSONResponse
 
 from backend.config import UPLOAD_DIR
@@ -31,12 +32,60 @@ async def create_job(
 
     df = pd.read_csv(dataset_path)
     columns = df.columns.tolist()
-    # Replace NaN/Inf with None so they serialize to JSON null
-    sample_rows = [
-        {k: (None if isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf")) else v)
-         for k, v in row.items()}
-        for row in df.head(5).to_dict(orient="records")
-    ]
+
+    def _clean(v: Any) -> Any:
+        if isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf")):
+            return None
+        return v
+
+    def _rows(frame: pd.DataFrame) -> list:
+        return [{k: _clean(v) for k, v in row.items()} for row in frame.to_dict(orient="records")]
+
+    last_col = df.columns[-1]
+    unique_vals = df[last_col].dropna().unique()
+    is_classification = len(unique_vals) <= 10
+
+    # ── In-distribution sample pool (for Any / 0 / 1 filters) ────────────────
+    # Take up to 20 rows per class so the tester always has plenty of each.
+    try:
+        if is_classification:
+            per_class = max(20, 60 // len(unique_vals))
+            parts = [
+                df[df[last_col] == v].sample(min(per_class, int((df[last_col] == v).sum())), random_state=42)
+                for v in unique_vals
+            ]
+            sample_df = pd.concat(parts).sample(frac=1, random_state=42)
+        else:
+            sample_df = df.sample(min(60, len(df)), random_state=42)
+    except Exception:
+        sample_df = df.sample(min(60, len(df)), random_state=42)
+
+    sample_rows = _rows(sample_df)
+
+    # ── Held-out rows (rows NOT seen during training) ─────────────────────────
+    # Reconstruct the same train/test split the generated code uses
+    # (test_size=0.2, random_state=42, stratified on the last column).
+    held_out_rows: list = []
+    try:
+        y_proxy = df[last_col]
+        strat = y_proxy if is_classification else None
+        _, test_df = train_test_split(df, test_size=0.2, random_state=42, stratify=strat)
+        if is_classification:
+            # Up to 15 per class from the held-out set
+            per_class = max(15, 40 // len(unique_vals))
+            parts = [
+                test_df[test_df[last_col] == v].sample(
+                    min(per_class, int((test_df[last_col] == v).sum())), random_state=7
+                )
+                for v in unique_vals if v in test_df[last_col].values
+            ]
+            held_out_df = pd.concat(parts).sample(frac=1, random_state=7)
+        else:
+            held_out_df = test_df.sample(min(40, len(test_df)), random_state=7)
+        held_out_rows = _rows(held_out_df)
+    except Exception:
+        held_out_rows = []
+
     row_count = len(df)
 
     initial_state: PrometheusState = {
@@ -45,6 +94,7 @@ async def create_job(
         "dataset_path": dataset_path,
         "dataset_columns": columns,
         "dataset_sample_rows": sample_rows,
+        "dataset_held_out_rows": held_out_rows,
         "dataset_row_count": row_count,
         "task_type": None,
         "target_column": None,
@@ -172,51 +222,111 @@ async def test_predict(job_id: str, body: Dict[str, Any]):
         with open(pkl_path, "rb") as f:
             save_obj = pickle.load(f)
 
-        # Support both plain dict format and legacy pipeline format
-        if isinstance(save_obj, dict) and "model" in save_obj:
-            model = save_obj["model"]
+        if not isinstance(save_obj, dict):
+            save_obj = {"model": save_obj}
+
+        model = save_obj["model"]
+        encoding_map = save_obj.get("encoding_map")
+
+        if encoding_map:
+            target_col = encoding_map.get("target_column") or state.get("target_column", "")
+            orig_cols = encoding_map.get("original_feature_columns") or \
+                        [c for c in state.get("dataset_columns", []) if c != target_col]
+
+            row = {col: body.get(col) for col in orig_cols}
+            df = pd.DataFrame([row])
+
+            # Fix numeric strings
+            for col in list(df.columns):
+                if df[col].dtype == "object":
+                    conv = pd.to_numeric(df[col], errors="coerce")
+                    if not conv.isna().all():
+                        df[col] = conv
+
+            # Binary encoding
+            for col, enc in encoding_map.get("binary_encoders", {}).items():
+                if col in df.columns:
+                    df[col] = df[col].fillna("missing").astype(str).map(enc["mapping"]).fillna(0).astype(int)
+
+            # One-hot encoding
+            for col, enc in encoding_map.get("multi_encoders", {}).items():
+                if col in df.columns:
+                    col_to_cat = enc.get("col_to_category", {})
+                    # fillna("nan") matches training's fillna('nan') so NaN columns align correctly
+                    col_series = df[col].apply(
+                        lambda x: float("nan") if x is None else x
+                    ).fillna("nan").astype(str)
+                    for enc_col in enc.get("encoded_columns", []):
+                        category = col_to_cat.get(enc_col) if col_to_cat else enc_col[len(col) + 1:]
+                        df[enc_col] = (col_series == category).astype(int)
+                    df = df.drop(columns=[col])
+
+            # Numeric imputation
+            for col, med in encoding_map.get("num_medians", {}).items():
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(med)
+
+            # Align to training feature order
+            feature_cols = encoding_map.get("feature_columns_after_encoding", [])
+            if feature_cols:
+                df = df.reindex(columns=feature_cols, fill_value=0)
+
+            pred_raw = model.predict(df)[0]
+            if hasattr(pred_raw, "item"):
+                pred_raw = pred_raw.item()
+
+            reverse_map = encoding_map.get("reverse_target_mapping", {})
+            if reverse_map:
+                try:
+                    prediction = reverse_map.get(int(round(float(pred_raw))), str(pred_raw))
+                except (ValueError, TypeError):
+                    prediction = str(pred_raw)
+            else:
+                prediction = pred_raw
+
+            probability = None
+            if hasattr(model, "predict_proba") and state.get("task_type") == "binary_classification":
+                probability = round(float(model.predict_proba(df)[0][1]), 4)
+
+            return {"prediction": prediction, "probability": probability, "target_column": target_col}
+
+        else:
+            # Legacy pkl format (without encoding_map)
             cat_encodings = save_obj.get("cat_encodings", {})
             num_medians = save_obj.get("num_medians", {})
             feature_names = save_obj.get("feature_names", [])
-        else:
-            model = save_obj  # legacy: raw model or pipeline
-            cat_encodings = {}
-            num_medians = {}
-            feature_names = []
 
-        target_col = state.get("target_column", "")
-        feature_cols = feature_names or [c for c in state.get("dataset_columns", []) if c != target_col]
+            target_col = state.get("target_column", "")
+            feature_cols = feature_names or [c for c in state.get("dataset_columns", []) if c != target_col]
 
-        row = {col: body.get(col) for col in feature_cols}
-        df = pd.DataFrame([row])
+            row = {col: body.get(col) for col in feature_cols}
+            df = pd.DataFrame([row])
 
-        # Apply category encodings
-        for col, mapping in cat_encodings.items():
-            if col in df.columns:
-                df[col] = df[col].fillna("missing").astype(str).map(mapping).fillna(len(mapping)).astype(int)
+            for col, mapping in cat_encodings.items():
+                if col in df.columns:
+                    df[col] = df[col].fillna("missing").astype(str).map(mapping).fillna(len(mapping)).astype(int)
 
-        # Apply numeric imputation
-        for col, med in num_medians.items():
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(med)
+            for col, med in num_medians.items():
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(med)
 
-        # Fill anything still missing
-        for col in df.columns:
-            if col not in cat_encodings and col not in num_medians:
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            for col in df.columns:
+                if col not in cat_encodings and col not in num_medians:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-        if feature_names:
-            df = df.reindex(columns=feature_names, fill_value=0)
+            if feature_names:
+                df = df.reindex(columns=feature_names, fill_value=0)
 
-        prediction = model.predict(df)[0]
-        if hasattr(prediction, "item"):
-            prediction = prediction.item()
+            prediction = model.predict(df)[0]
+            if hasattr(prediction, "item"):
+                prediction = prediction.item()
 
-        probability = None
-        if hasattr(model, "predict_proba") and state.get("task_type") == "binary_classification":
-            probability = round(float(model.predict_proba(df)[0][1]), 4)
+            probability = None
+            if hasattr(model, "predict_proba") and state.get("task_type") == "binary_classification":
+                probability = round(float(model.predict_proba(df)[0][1]), 4)
 
-        return {"prediction": prediction, "probability": probability, "target_column": target_col}
+            return {"prediction": prediction, "probability": probability, "target_column": target_col}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

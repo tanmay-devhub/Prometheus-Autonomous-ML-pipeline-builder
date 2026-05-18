@@ -1,4 +1,4 @@
-# ── Python ───────────────────────────────────────────────────
+# ── Python ────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,41 +9,67 @@ __pycache__/
 dist/
 build/
 .eggs/
+*.manifest
+*.spec
 
-# ── Virtual environments ─────────────────────────────────────
+# ── Virtual environments ──────────────────────────────────────
 venv/
 .venv/
 env/
 .env/
+ENV/
 
-# ── Secrets / environment ────────────────────────────────────
+# ── Secrets / environment ─────────────────────────────────────
 .env
 .env.local
+.env.*.local
 .env.production
+.env.staging
 frontend/.env.local
+frontend/.env.production
 
-# ── Databases ────────────────────────────────────────────────
+# ── Databases & ML artifacts ──────────────────────────────────
 *.db
+*.sqlite
 *.sqlite3
-
-# ── ML artifacts & uploads ───────────────────────────────────
 mlruns/
 artifacts/
 uploads/
 *.pkl
 *.joblib
+*.h5
+*.hdf5
 
 # Ignore CSVs everywhere except the demo_datasets folder
 *.csv
 !demo_datasets/
 !demo_datasets/*.csv
 
-# ── Logs & Celery ────────────────────────────────────────────
+# ── Logs ──────────────────────────────────────────────────────
 *.log
+*.log.*
+logs/
 celerybeat-schedule
 celerybeat.pid
+celery_worker.pid
 
-# ── Node / Next.js ───────────────────────────────────────────
+# ── Testing & coverage ────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+nosetests.xml
+test-results/
+
+# ── Type checking ─────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+.pyright/
+.ruff_cache/
+
+# ── Node / Next.js ────────────────────────────────────────────
 node_modules/
 frontend/node_modules/
 .next/
@@ -51,15 +77,39 @@ frontend/.next/
 out/
 frontend/out/
 npm-debug.log*
+yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
+frontend/tsconfig.tsbuildinfo
 
-# ── IDE ──────────────────────────────────────────────────────
+# ── IDE / editor ──────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+*.swn
+*~
+.project
+.classpath
+.settings/
 
-# ── OS ───────────────────────────────────────────────────────
+# ── OS ────────────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
 desktop.ini
+ehthumbs.db
+
+# ── Temp / scratch ────────────────────────────────────────────
+temp/
+tmp/
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# ── Claude Code (AI assistant project files) ──────────────────
+.claude/

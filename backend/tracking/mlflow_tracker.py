@@ -39,7 +39,7 @@ class MLflowTracker:
     def log_code(self, run_id: str, code: str):
         with mlflow.start_run(run_id=run_id):
             with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".py", prefix="pipeline_code_", delete=False
+                mode="w", suffix=".py", prefix="pipeline_code_", delete=False, encoding="utf-8"
             ) as f:
                 f.write(code)
                 tmp_path = f.name

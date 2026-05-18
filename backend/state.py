@@ -22,7 +22,8 @@ class PrometheusState(TypedDict):
     user_description: str
     dataset_path: str
     dataset_columns: List[str]
-    dataset_sample_rows: List[Dict[str, Any]]
+    dataset_sample_rows: List[Dict[str, Any]]   # in-distribution sample for testing
+    dataset_held_out_rows: List[Dict[str, Any]] # approximate test-split rows (not seen in training)
     dataset_row_count: int
 
     # Problem analysis

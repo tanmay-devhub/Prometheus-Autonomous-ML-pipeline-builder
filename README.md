@@ -1,6 +1,20 @@
 # Prometheus — Autonomous ML Pipeline Builder
 
-Prometheus takes a plain-English description of an ML problem and a CSV file, then autonomously builds, debugs, evaluates, and packages a production-ready ML model — with two human approval gates along the way.
+Prometheus takes a plain-English description of an ML problem and a CSV file, then autonomously builds, debugs, evaluates, and packages a production-ready ML model — with two human approval gates and a live in-browser test panel.
+
+> **v1 — Binary classification only.** Regression support is planned for v2.
+
+---
+
+## Demo results
+
+| Dataset | Accuracy | Unseen rows tested | Notes |
+|---------|----------|--------------------|-------|
+| Titanic (survival) | **80%** | 24 held-out | 0/1 numeric labels |
+| Heart disease | **88%** | 22 held-out | Numeric features, class-balanced |
+| Customer churn | **75%** | 15 held-out | Yes/No string labels, full encoding round-trip |
+
+All results on truly held-out rows not seen during training, tested live through the prediction panel.
 
 ---
 
@@ -8,301 +22,222 @@ Prometheus takes a plain-English description of an ML problem and a CSV file, th
 
 1. **Analyzes** your problem description and infers task type, target column, and evaluation metric
 2. **Profiles** your dataset — null rates, distributions, class imbalance, leakage warnings
-3. **Designs** two meaningfully different ML pipeline architectures
-4. **Runs** both experiments in isolated E2B cloud sandboxes, with automatic debugging on failure
-5. **Selects** the best model based on held-out metric score
-6. **Generates** a deployable FastAPI endpoint and a model card
-7. **Lets you test** predictions directly in the browser — no local setup needed
+3. **Designs** two architecturally distinct ML pipeline architectures in parallel
+4. **Executes** both pipelines in isolated E2B cloud sandboxes with automatic debugging on failure
+5. **Selects** the winning model with a written justification
+6. **Generates** a model card, SHAP feature importance, and plain-English explanation
+7. **Deploys** a self-contained FastAPI endpoint with a downloadable `model.pkl`
 
 ---
 
-## Key Features
+## Features
 
 - **Zero-code ML** — describe your problem in plain English, upload a CSV, done
-- **Autonomous debugging** — up to 3 retries per experiment with LLM-guided fixes; regenerates from scratch if stuck in a loop
+- **Autonomous debugging** — up to 3 retries per experiment with LLM-guided fixes; regenerates from scratch if stuck in the same failure loop
+- **Smart preprocessing** — binary encoding, one-hot encoding, NaN-consistent imputation, and class balancing handled automatically
 - **Two human approval gates** — review problem analysis before training; review model results before deployment
-- **In-browser testing** — run predictions against your trained model directly from the UI
+- **In-browser test panel** — predict live against your trained model; filter by class or test unseen held-out rows (shown as diamonds ◆)
 - **Downloadable artifacts** — `endpoint.py` + `model.pkl` for self-hosting
-- **Full audit trail** — every agent decision logged in the debug log
+- **Full audit trail** — every agent decision, LLM call, retry, and fix logged in the debug log
 - **MLflow tracking** — all experiments tracked with parameters, metrics, and code snapshots
-- **Free-tier AI** — Ollama (local LLMs) + Gemini 2.0 Flash free tier; no paid API required
+- **Free-tier AI** — Ollama (local LLMs) + Gemini free tier; no paid API required
 
 ---
 
-## Architecture
+## Pipeline
 
 ```
-Browser (localhost:3002)
-    │
-    ▼
-Next.js Frontend
-    │  polls /jobs/{id}/status every 3s
-    ▼
-FastAPI Backend (localhost:8000)
-    │
-    ├── Celery Worker  ←─── Redis (task queue)
-    │       │
-    │       ▼
-    │   Agent Pipeline
-    │       ├── problem_analyzer      → Ollama llama3.1:8b
-    │       ├── data_profiler         → Ollama llama3.1:8b
-    │       ├── pipeline_designer     → Ollama llama3.1:8b
-    │       ├── code_generator        → Ollama deepseek-coder:6.7b
-    │       ├── E2B Sandbox           → cloud execution
-    │       ├── failure_diagnostician → Ollama llama3.1:8b
-    │       ├── fix_executor          → Ollama deepseek-coder:6.7b
-    │       ├── model_selector        → Gemini 2.0 Flash
-    │       ├── documentation_agent   → Ollama llama3.1:8b
-    │       └── output_agent          → Ollama deepseek-coder:6.7b
-    │
-    ├── SQLite  (job state + LLM call log)
-    └── MLflow  (experiment tracking, localhost:5000)
+Upload CSV + description
+        │
+        ▼
+  problem_analyzer          ← llama3.1:8b  — infers task type, target column, metric
+        │
+        ▼
+  ─── APPROVAL GATE 1 ───   ← user confirms / corrects task type and target
+        │
+        ▼
+  data_profiler             ← stats, null rates, leakage detection, imbalance check
+        │
+        ▼
+  pipeline_designer         ← llama3.1:8b  — designs 2 contrasting architectures
+        │
+        ├────────────────────────────────────────────────┐
+        ▼                                                ▼
+  code_generator (A)                           code_generator (B)    ← deepseek-coder:6.7b
+  E2B sandbox execution                        E2B sandbox execution
+  result_interpreter                           result_interpreter
+  failure_diagnostician                        failure_diagnostician
+  fix_executor  (up to ×3)                     fix_executor  (up to ×3)
+        │                                                │
+        └──────────────────── JOIN ──────────────────────┘
+                              │
+                              ▼
+                      model_selector             ← Gemini 1.5 Flash — picks winner
+                              │
+                              ▼
+                  ─── APPROVAL GATE 2 ───        ← user approves model before deployment
+                              │
+                              ▼
+                  documentation_agent            ← model card + SHAP explanation
+                              │
+                              ▼
+                      output_agent               ← FastAPI endpoint + requirements.txt
+                              │
+                              ▼
+                          DEPLOYED ✓
 ```
 
-### LLM Routing
+### LLM routing
 
 | Task | Model | Why |
 |------|-------|-----|
 | Code generation / fixing | `deepseek-coder:6.7b` (Ollama) | Specialized code model |
-| Reasoning / analysis / profiling | `llama3.1:8b` (Ollama) | General reasoning |
-| Model selection / complex decisions | `gemini-2.0-flash` (API) | Best quality for critical choices |
+| Problem analysis / profiling / interpretation | `llama3.1:8b` (Ollama) | General reasoning, runs locally |
+| Model selection / complex decisions | `gemini-1.5-flash` (API) | Strongest reasoning for critical choices |
 
 ---
 
-## Tech Stack
+## Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 14 · TypeScript · Tailwind CSS · Recharts |
-| Backend | FastAPI · Python 3.11+ · Celery · SQLAlchemy |
+| Frontend | Next.js 14 · TypeScript · Tailwind CSS · Framer Motion · Recharts |
+| Backend | FastAPI · Python 3.11+ · Celery |
+| Pipeline orchestration | LangGraph StateGraph |
 | Local LLMs | Ollama (`llama3.1:8b` + `deepseek-coder:6.7b`) |
-| Cloud LLM | Gemini 2.0 Flash (free tier) |
+| Cloud LLM | Gemini 1.5 Flash (free tier) |
 | Code execution | E2B cloud sandboxes |
 | ML libraries | scikit-learn · XGBoost · LightGBM · SHAP |
 | Experiment tracking | MLflow |
 | Task queue | Celery + Redis 7 |
-| Database | SQLite |
+| State persistence | SQLite |
 
 ---
 
 ## Prerequisites
 
-| Requirement | Install |
-|-------------|---------|
-| Python 3.11+ | [python.org](https://python.org) |
-| Node.js 18+ | [nodejs.org](https://nodejs.org) |
-| Docker Desktop | [docker.com](https://docker.com) — for Redis + MLflow |
-| Ollama | [ollama.ai](https://ollama.ai) — runs LLMs locally |
-| Gemini API key | Free at [aistudio.google.com](https://aistudio.google.com) |
-| E2B API key | Free at [e2b.dev](https://e2b.dev) |
+| Requirement | Notes |
+|-------------|-------|
+| Python 3.11+ | Backend + Celery |
+| Node.js 18+ | Frontend |
+| [Ollama](https://ollama.ai) | Local LLM inference |
+| [E2B API key](https://e2b.dev) | Sandbox execution — free tier available |
+| [Gemini API key](https://aistudio.google.com) | Free tier, 1M tokens/day |
+| Docker Desktop | Redis + MLflow via `docker-compose` |
 
 ---
 
-## Quick Start
+## Quick start
 
 ### 1. Clone and configure
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/your-username/prometheus.git
 cd prometheus
+cp .env.example .env
+# Edit .env — fill in GEMINI_API_KEY and E2B_API_KEY
 ```
 
-Copy the example env and fill in your keys:
+### 2. Install dependencies
 
 ```bash
-cp .env.example .env
+# Python
+pip install -r requirements.txt
+
+# Node
+cd frontend && npm install && cd ..
 ```
 
-`.env` contents:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-E2B_API_KEY=your_e2b_api_key_here
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_REASONING_MODEL=llama3.1:8b
-OLLAMA_CODE_MODEL=deepseek-coder:6.7b
-GEMINI_MODEL=gemini-2.0-flash
-MLFLOW_TRACKING_URI=sqlite:///mlflow.db
-REDIS_URL=redis://localhost:6379
-DATABASE_URL=sqlite:///prometheus.db
-MAX_RETRIES=3
-E2B_TIMEOUT_SECONDS=300
-```
-
-### 2. Pull Ollama models
+### 3. Pull Ollama models
 
 ```bash
 ollama pull llama3.1:8b
 ollama pull deepseek-coder:6.7b
 ```
 
-### 3. Start everything (Windows)
+### 4. Start services
 
-```bash
+**Windows — one-click:**
+```
 start.bat
 ```
 
-This opens separate windows for each service. Or run manually:
+**Manual (all platforms):**
 
 ```bash
-# Terminal 1 — Infrastructure
+# Terminal 1 — Ollama
+ollama serve
+
+# Terminal 2 — Redis + MLflow
 docker-compose up -d
 
-# Terminal 2 — Backend (from prometheus/ folder)
-set PYTHONPATH=D:\path\to\prometheus
-python -m pip install -r requirements.txt
-python -m uvicorn backend.main:app --reload --reload-dir backend --port 8000
+# Terminal 3 — FastAPI backend
+uvicorn backend.main:app --reload --port 8000
 
-# Terminal 3 — Celery worker (from prometheus/ folder)
-set PYTHONPATH=D:\path\to\prometheus
-python -m celery -A backend.celery_app worker --loglevel=info --pool=solo
+# Terminal 4 — Celery worker
+# Windows:
+celery -A backend.celery_app worker --loglevel=info --pool=solo
+# Linux / macOS:
+celery -A backend.celery_app worker --loglevel=info
 
-# Terminal 4 — Frontend
-cd frontend && npm install && npm run dev -- --port 3002
+# Terminal 5 — Frontend
+cd frontend && npm run dev
 ```
 
-### 4. Open the app
+### 5. Open the app
 
 | Service | URL |
 |---------|-----|
-| **Prometheus UI** | http://localhost:3002 |
+| **Prometheus UI** | http://localhost:3000 |
 | Backend API docs | http://localhost:8000/docs |
 | MLflow UI | http://localhost:5000 |
 
 ---
 
-## Pipeline Walkthrough
+## Preprocessing (automatic)
 
-### Stage 1 — Problem Analysis *(~30 sec)*
-Reads your description, infers task type (`binary_classification` / `regression`), target column, and evaluation metric. Flags potential issues.
+All preprocessing is applied identically in training and at prediction time — no manual feature engineering required.
 
-**→ Human gate:** Review and correct before training starts.
+| Step | What happens |
+|------|-------------|
+| Numeric string repair | Columns like `"1.5"` auto-converted to float |
+| Target encoding | String labels (`Yes`/`No`, `True`/`False`) mapped to 0/1; reversed at prediction time |
+| Binary feature encoding | 2-class string columns encoded via `LabelEncoder` |
+| Multi-category encoding | 3+ class string columns one-hot encoded; XGBoost/LightGBM-safe column names |
+| Numeric imputation | Median fill computed from training data only (no leakage) |
+| Class balancing | Automatic for all binary classifiers (see below) |
+| NaN consistency | `fillna("nan")` applied identically in training and at prediction time |
 
-### Stage 2 — Data Profiling *(~30 sec)*
-Scans every column: null rates, distributions, class imbalance detection, potential leakage warnings, LLM-generated dataset interpretation.
+### Class balancing
 
-### Stage 3 — Pipeline Design *(~20 sec)*
-Proposes two architecturally different ML pipelines tailored to your dataset (e.g. gradient boosting vs. logistic regression, or a complex ensemble vs. a linear model).
-
-### Stage 4 — Parallel Experiments *(2–5 min)*
-Both pipelines run simultaneously in E2B cloud sandboxes:
-- Generates complete Python training scripts with OrdinalEncoder + median imputation
-- Validates syntax, imports, and column references before submission
-- Automatic retry loop (up to 3): classifies failure → generates targeted fix
-- If the same error repeats on consecutive retries, discards code and regenerates from scratch
-
-### Stage 5 — Model Selection *(~20 sec)*
-Gemini 2.0 Flash compares both experiments by metric score and writes a selection justification.
-
-**→ Human gate:** Review results, optionally switch to the other experiment, then approve.
-
-### Stage 6 — Documentation *(~30 sec)*
-Generates a model card: algorithm, training data, performance, limitations, intended use, and how-not-to-use.
-
-### Stage 7 — Output Generation *(~30 sec)*
-Produces:
-- **`endpoint.py`** — self-contained FastAPI app with `/predict`, `/health`, `/features`
-- **`model.pkl`** — dict containing the trained model, category encodings, and numeric medians
+| Model | Method |
+|-------|--------|
+| `RandomForestClassifier`, `LogisticRegression`, `LGBMClassifier` | `class_weight='balanced'` |
+| `XGBClassifier` | `scale_pos_weight = n_negative / n_positive` |
+| `GradientBoostingClassifier` | `compute_sample_weight('balanced', y_train)` |
 
 ---
 
-## In-Browser Prediction Testing
+## Self-hosting the endpoint
 
-After a pipeline completes, the **Test Model** panel appears on the results page. It:
-- Pre-fills all feature fields with a sample row from your dataset
-- Sends the values to `POST /jobs/{id}/test-predict` on the Prometheus backend
-- Returns the prediction and confidence score instantly
-
-No separate server or local dependencies needed.
-
----
-
-## Self-Hosting the Endpoint
-
-Download both files from the results page, then:
+Download `endpoint.py` and `model.pkl` from the results page, then:
 
 ```bash
-mkdir my_model && cd my_model
-# Place endpoint.py and model.pkl here
-
-pip install fastapi>=0.110.0 uvicorn>=0.29.0 pydantic>=2.0.0 \
-    scikit-learn>=1.3.0 xgboost>=2.0.0 lightgbm>=4.0.0 \
-    pandas>=2.0.0 numpy>=1.26.0
-
+pip install fastapi uvicorn pydantic scikit-learn xgboost lightgbm pandas numpy
 uvicorn endpoint:app --host 0.0.0.0 --port 8001
 ```
 
-Open **http://localhost:8001/docs** for the interactive Swagger UI.
+Open **http://localhost:8001/docs** for interactive Swagger UI.
 
-> **sklearn version note:** `model.pkl` is built inside an E2B sandbox. If you get an `AttributeError` on load, run:
-> `pip install "scikit-learn>=1.3.0,<2.0.0" --upgrade`
-
----
-
-## Project Structure
-
-```
-prometheus/
-├── backend/
-│   ├── agents/              # 10 autonomous ML agents
-│   │   ├── problem_analyzer.py
-│   │   ├── data_profiler.py
-│   │   ├── pipeline_designer.py
-│   │   ├── code_generator.py
-│   │   ├── result_interpreter.py
-│   │   ├── failure_diagnostician.py
-│   │   ├── fix_executor.py
-│   │   ├── model_selector.py
-│   │   ├── documentation_agent.py
-│   │   └── output_agent.py
-│   ├── llm/
-│   │   ├── router.py        # Routes tasks to correct LLM + fallback logic
-│   │   ├── ollama_client.py
-│   │   └── gemini_client.py
-│   ├── routers/
-│   │   ├── jobs.py          # Job CRUD, test-predict, model download
-│   │   └── approvals.py     # Human approval gate endpoints
-│   ├── tracking/
-│   │   └── mlflow_tracker.py
-│   ├── main.py              # FastAPI app entry point
-│   ├── state.py             # PrometheusState TypedDict (single source of truth)
-│   ├── config.py            # Environment variables
-│   ├── db.py                # SQLite job persistence (NaN-safe JSON encoder)
-│   ├── graph.py             # Parallel experiment runner
-│   └── celery_app.py        # Celery configuration
-├── execution/
-│   ├── e2b_executor.py      # E2B sandbox runner + pkl retrieval via stdout
-│   └── code_validator.py    # Pre-submission code checks (syntax, imports, columns)
-├── frontend/
-│   ├── app/
-│   │   ├── components/
-│   │   │   ├── UploadPanel.tsx
-│   │   │   ├── ApprovalGate.tsx
-│   │   │   ├── ProfileView.tsx
-│   │   │   ├── ExperimentPanel.tsx
-│   │   │   ├── PipelineProgress.tsx
-│   │   │   ├── TestModelPanel.tsx
-│   │   │   ├── ModelCard.tsx
-│   │   │   ├── EndpointViewer.tsx
-│   │   │   └── DebugLog.tsx
-│   │   ├── page.tsx         # Main app shell with polling logic
-│   │   └── layout.tsx
-│   └── lib/
-│       └── api.ts           # Typed API client
-├── demo_datasets/
-│   ├── titanic.csv          # Binary classification (target: Survived)
-│   └── heart_disease.csv    # Binary classification (target: target)
-├── tasks.py                 # Celery task definitions (phase-based pipeline)
-├── docker-compose.yml       # Redis 7 + MLflow
-├── requirements.txt         # Python dependencies
-├── start.bat                # One-click Windows launcher
-├── .env                     # API keys — never commit this
-└── .gitignore
-```
+The endpoint exposes:
+- `POST /predict` — submit feature values, get prediction + probability + original label
+- `GET /encoding` — inspect how input features are encoded
+- `GET /features` — list required input fields
+- `GET /health` — liveness check
 
 ---
 
-## API Reference
+## API reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -312,37 +247,90 @@ prometheus/
 | `GET` | `/jobs/{id}/profile` | Dataset profile report |
 | `GET` | `/jobs/{id}/experiments` | Both experiment results |
 | `GET` | `/jobs/{id}/debug-log` | Full agent decision log |
-| `POST` | `/jobs/{id}/approve-problem` | Approve problem analysis |
-| `POST` | `/jobs/{id}/approve-model` | Approve model selection |
-| `POST` | `/jobs/{id}/test-predict` | Run in-browser prediction |
+| `POST` | `/jobs/{id}/approve-problem` | Approve / correct problem analysis |
+| `POST` | `/jobs/{id}/approve-model` | Approve winning model |
+| `POST` | `/jobs/{id}/test-predict` | Live in-browser prediction |
 | `GET` | `/jobs/{id}/model-card` | Model card text |
-| `GET` | `/jobs/{id}/endpoint-code` | endpoint.py source |
-| `GET` | `/jobs/{id}/model.pkl` | Download model.pkl |
+| `GET` | `/jobs/{id}/endpoint-code` | `endpoint.py` source |
+| `GET` | `/jobs/{id}/model.pkl` | Download trained model |
 | `GET` | `/jobs/{id}/explanation` | SHAP features + justification |
 
 Full interactive docs: **http://localhost:8000/docs**
 
 ---
 
-## Supported Tasks & Models
+## Supported models (v1)
 
-**v1 — Tabular data only**
-
-| Task | Metric | Supported models |
-|------|--------|-----------------|
-| Binary classification | ROC-AUC | LogisticRegression, RandomForest, GradientBoosting, XGBoost, LightGBM |
-| Regression | R², RMSE | Ridge, RandomForest, GradientBoosting, XGBoost, LightGBM |
+| Model | Notes |
+|-------|-------|
+| `LogisticRegression` | Linear baseline, fast |
+| `RandomForestClassifier` | Strong all-rounder |
+| `GradientBoostingClassifier` | Robust to outliers |
+| `XGBClassifier` | High accuracy, fast inference |
+| `LGBMClassifier` | Best on large datasets |
 
 ---
 
-## Known Limitations
+## Project structure
 
-- **Tabular only** — no image, text, or time-series support in v1
-- **Binary classification only** — multi-class not yet supported
-- **E2B required** — experiments need an active E2B key and internet access
-- **Ollama must run locally** — LLMs are not called remotely; Ollama must be on the same machine
-- **Windows `--pool=solo`** — Celery on Windows requires `--pool=solo`; Linux/Mac should use `--pool=prefork`
-- **sklearn version coupling** — `model.pkl` is built in E2B with the latest sklearn; see note above if loading fails locally
+```
+prometheus/
+├── backend/
+│   ├── agents/              # 10 autonomous ML agents
+│   ├── llm/                 # Router + Ollama + Gemini clients
+│   ├── routers/             # FastAPI endpoints
+│   ├── tracking/            # MLflow integration
+│   ├── main.py
+│   ├── state.py             # PrometheusState TypedDict — single source of truth
+│   ├── graph.py             # Parallel experiment runner
+│   └── db.py                # SQLite persistence
+├── execution/
+│   ├── e2b_executor.py      # Sandbox runner
+│   └── code_validator.py    # Pre-submission static checks
+├── frontend/
+│   ├── app/
+│   │   ├── components/      # All React UI components
+│   │   ├── lib/api.ts       # Typed backend API client
+│   │   └── page.tsx         # App shell + polling logic
+│   └── public/
+├── demo_datasets/
+│   ├── titanic.csv
+│   └── heart_disease.csv
+├── tests/
+├── tasks.py                 # Celery pipeline task definitions
+├── docker-compose.yml       # Redis + MLflow
+├── requirements.txt
+├── start.bat                # Windows one-click launcher
+└── .env.example
+```
+
+---
+
+## Roadmap
+
+- [x] Binary classification — end-to-end pipeline
+- [x] Automatic preprocessing — encoding, imputation, class balancing
+- [x] Live prediction panel with unseen held-out row testing
+- [x] Model card + SHAP feature importance + plain-English explanation
+- [x] FastAPI endpoint generation + `model.pkl` download
+- [x] Autonomous debug loop with regeneration on repeated failures
+- [x] Two human approval gates
+- [x] MLflow experiment tracking
+- [ ] **Regression** — v2
+- [ ] Multi-class classification — v2
+- [ ] Time-series support — v3
+- [ ] Cloud deployment — v3
+
+---
+
+## Known limitations
+
+- **Binary classification only** — regression and multi-class are blocked in v1
+- **Tabular data only** — no image, text, audio, or time-series support
+- **E2B required** — experiments need an active E2B API key and internet access
+- **Ollama must run locally** — LLM inference is not remote; Ollama must be on the same machine as the backend
+- **Windows Celery** — requires `--pool=solo`; Linux/macOS should use the default `prefork` pool
+- **sklearn version coupling** — `model.pkl` is built in E2B; if loading locally fails, pin `scikit-learn>=1.3.0,<2.0.0`
 
 ---
 

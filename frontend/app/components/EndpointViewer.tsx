@@ -1,126 +1,107 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 
-interface Props {
-  endpointCode: string;
-  requirements: string;
-  jobId: string;
+interface Props { endpointCode: string; requirements: string; jobId: string; }
+
+function highlight(code: string) {
+  return code.split("\n").map((line, i) => {
+    const cls = line.trim().startsWith("#") ? "tok-cmt"
+      : /^(import|from|def |class |return|if |else|elif|for |with |as |global|async |await )/.test(line.trim()) ? "tok-kw"
+      : /['"].*?['"]/.test(line) ? ""
+      : "";
+    return (
+      <div key={i} className="flex">
+        <span className="w-8 text-right shrink-0 text-ink-600 select-none mr-3 text-[11px]">{String(i + 1).padStart(2, "0")}</span>
+        <span className={`flex-1 text-[11.5px] ${cls}`}>{line || " "}</span>
+      </div>
+    );
+  });
 }
 
 export default function EndpointViewer({ endpointCode, requirements, jobId }: Props) {
+  const [tab, setTab] = useState<"code" | "req" | "deploy">("code");
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(endpointCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const tabs = [
+    { id: "code" as const,   label: "endpoint.py" },
+    { id: "req" as const,    label: "requirements.txt" },
+    { id: "deploy" as const, label: "deployment.md" },
+  ];
 
-  const handleDownload = () => {
-    const blob = new Blob([endpointCode], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "endpoint.py";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const deployContent = `# Quickstart
+$ pip install -r requirements.txt
+$ uvicorn endpoint:app --host 0.0.0.0 --port 8001
 
-  const handleDownloadModel = () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    window.open(`${apiBase}/jobs/${jobId}/model.pkl`, "_blank");
+# Test
+$ curl -X POST localhost:8001/predict \\
+    -H "Content-Type: application/json" \\
+    -d '{"feature1": 1.0, "feature2": "value"}'
+
+# sklearn version note
+pip install "scikit-learn>=1.3.0,<2.0.0" --upgrade`;
+
+  const content = tab === "code" ? endpointCode : tab === "req" ? requirements : deployContent;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content ?? "");
+    setCopied(true); setTimeout(() => setCopied(false), 1600);
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-white">Generated FastAPI Endpoint</h2>
-        <div className="flex gap-3">
-          <button
-            onClick={handleCopy}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
-          >
-            {copied ? "Copied!" : "Copy"}
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.05 }}
+      className="glass-strong rounded-2xl overflow-hidden">
+      <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-ink-700/60">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-accent-violet/15 border border-accent-violet/40 flex items-center justify-center text-accent-violet">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M8 4L4 12L8 20M16 4L20 12L16 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </div>
+          <div>
+            <div className="text-[15px] font-semibold tracking-tight">Generated endpoint</div>
+            <div className="text-[12px] text-ink-400 mt-0.5">FastAPI service / ready to deploy</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={handleCopy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-ink-800 hover:bg-ink-750 border border-ink-700 text-ink-200 text-[12px] transition-colors">
+            {copied ? (
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M5 12.5L10 17L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Copied</>
+            ) : (
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="8" y="8" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M5 16V6a1 1 0 0 1 1-1h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg> Copy</>
+            )}
           </button>
-          <button
-            onClick={handleDownload}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-          >
-            Download endpoint.py
-          </button>
-          <button
-            onClick={handleDownloadModel}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
-          >
-            Download model.pkl
-          </button>
+          <a href={`http://localhost:8000/jobs/${jobId}/endpoint-code`} target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent-blue/15 hover:bg-accent-blue/25 border border-accent-blue/40 text-accent-blueGlow text-[12px] transition-colors">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            endpoint.py
+          </a>
+          <a href={`http://localhost:8000/jobs/${jobId}/model.pkl`} target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent-emerald/15 hover:bg-accent-emerald/25 border border-accent-emerald/40 text-accent-emerald text-[12px] transition-colors">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            model.pkl
+          </a>
         </div>
       </div>
 
-      <div className="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-700 bg-gray-800">
-          <span className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="w-3 h-3 rounded-full bg-yellow-500" />
-          <span className="w-3 h-3 rounded-full bg-green-500" />
-          <span className="ml-2 text-gray-400 text-sm">endpoint.py</span>
-        </div>
-        <pre className="p-5 overflow-x-auto text-sm text-gray-300 max-h-[600px] overflow-y-auto leading-relaxed">
-          <code>{endpointCode}</code>
-        </pre>
+      <div className="px-6 pt-4 flex items-center gap-1">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`px-3 py-1.5 rounded-md font-mono text-[12px] transition-all ${tab === t.id ? "bg-ink-800 text-ink-100 border border-ink-700" : "text-ink-500 hover:text-ink-300 border border-transparent"}`}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-3">requirements.txt</h3>
-        <pre className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 whitespace-pre-wrap">
-          {requirements}
-        </pre>
-      </div>
-
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
-        <h3 className="text-lg font-semibold text-white">Deployment Instructions</h3>
-
-        <div className="space-y-3 text-sm text-gray-300">
-          <div>
-            <p className="text-gray-400 font-medium mb-1">Step 1 — Create a folder and download both files</p>
-            <pre className="bg-gray-900 rounded p-3 text-xs text-gray-300 overflow-x-auto">{`mkdir my_model
-cd my_model
-# Click "Download endpoint.py" and "Download model.pkl" above, then move them here`}</pre>
-          </div>
-
-          <div>
-            <p className="text-gray-400 font-medium mb-1">Step 2 — Install dependencies</p>
-            <pre className="bg-gray-900 rounded p-3 text-xs text-gray-300 overflow-x-auto">{`pip install -r requirements.txt`}</pre>
-            <div className="mt-2 bg-yellow-900/30 border border-yellow-700/50 rounded p-2 text-xs text-yellow-300">
-              <strong>Version mismatch warning:</strong> model.pkl is tied to the scikit-learn version used during training in the E2B sandbox. If you get errors like <code className="bg-yellow-900/50 px-1 rounded">AttributeError</code> on load, run:
-              <pre className="mt-1 text-yellow-200">{`pip install "scikit-learn>=1.3.0,<2.0.0" --upgrade`}</pre>
-            </div>
-          </div>
-
-          <div>
-            <p className="text-gray-400 font-medium mb-1">Step 3 — Start the API server</p>
-            <pre className="bg-gray-900 rounded p-3 text-xs text-gray-300 overflow-x-auto">{`uvicorn endpoint:app --host 0.0.0.0 --port 8000`}</pre>
-            <p className="text-gray-500 text-xs mt-1">The server starts at <span className="text-blue-400">http://localhost:8000</span></p>
-          </div>
-
-          <div>
-            <p className="text-gray-400 font-medium mb-1">Step 4 — Test a prediction</p>
-            <pre className="bg-gray-900 rounded p-3 text-xs text-gray-300 overflow-x-auto">{`curl -X POST http://localhost:8000/predict \\
-  -H "Content-Type: application/json" \\
-  -d '{"Pclass": 1, "Sex": "female", "Age": 29}'`}</pre>
-            <p className="text-gray-500 text-xs mt-1">Or open <span className="text-blue-400">http://localhost:8000/docs</span> for the interactive Swagger UI</p>
-          </div>
-
-          <div>
-            <p className="text-gray-400 font-medium mb-1">Other endpoints</p>
-            <ul className="space-y-1 text-xs text-gray-400">
-              <li><code className="text-blue-300">GET /health</code> — model status and metric value</li>
-              <li><code className="text-blue-300">GET /features</code> — list of required input columns</li>
-              <li><code className="text-blue-300">GET /docs</code> — Swagger interactive API docs</li>
-            </ul>
+      <div className="px-6 pb-6 pt-3">
+        <div className="rounded-lg bg-[#070A12] border border-ink-700/70 overflow-hidden">
+          <div className="px-4 py-3 font-mono leading-relaxed overflow-x-auto max-h-72 overflow-y-auto no-scrollbar">
+            {highlight(content || "")}
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
+
+
