@@ -36,9 +36,11 @@ mlruns/
 artifacts/
 artifacts/classification/
 artifacts/regression/
+artifacts/multiclassification/
 uploads/
 uploads/classification/
 uploads/regression/
+uploads/multiclassification/
 *.pkl
 *.joblib
 *.h5
@@ -115,10 +117,11 @@ tmp/
 *.orig
 *.rej
 
-# ── Prometheus runtime files ──────────────────────────────────
+# ── Prometheus runtime databases ──────────────────────────────
 celerybeat-schedule.db
 classification.db
 regression.db
+multiclassification.db
 prometheus.db
 shared.db
 mlflow.db

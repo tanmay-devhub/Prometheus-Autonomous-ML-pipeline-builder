@@ -56,20 +56,30 @@ function Confetti() {
 export default function ModelSelectionView({ experiments, jobData, onApprove, loading }: {
   experiments: ExperimentResult[];
   jobData: any;
-  onApprove: () => void;
+  onApprove: (selectedExperimentId?: string) => void;
   loading: boolean;
 }) {
   const [showConfetti, setShowConfetti] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setShowConfetti(true), 300); return () => clearTimeout(t); }, []);
-
-  const winner = experiments.find(e => e.experiment_id === jobData?.winning_experiment?.experiment_id)
+  const aiWinner = experiments.find(e => e.experiment_id === jobData?.winning_experiment?.experiment_id)
     ?? experiments.find(e => e.success)
     ?? experiments[0];
-  const loser = experiments.find(e => e !== winner);
-  const winnerScore = winner ? Object.values(winner.parsed_metrics ?? {})[0] ?? 0 : 0;
-  const loserScore = loser ? Object.values(loser.parsed_metrics ?? {})[0] ?? 0 : 0;
-  const metricName = winner ? Object.keys(winner.parsed_metrics ?? {})[0]?.toUpperCase().replace("_", "-") : "METRIC";
-  const justification = jobData?.winning_justification ?? "Selected based on highest held-out metric score across all validation folds.";
+  const loser = experiments.find(e => e !== aiWinner);
+
+  const [selected, setSelected] = useState<ExperimentResult | undefined>(aiWinner);
+  useEffect(() => { setSelected(aiWinner); }, [aiWinner?.experiment_id]);
+
+  useEffect(() => { const t = setTimeout(() => setShowConfetti(true), 300); return () => clearTimeout(t); }, []);
+
+  const winner = selected ?? aiWinner;
+  const isOverridden = selected && aiWinner && selected.experiment_id !== aiWinner.experiment_id;
+
+  const metricKey = winner ? Object.keys(winner.parsed_metrics ?? {}).find(k => !["train_samples","test_samples"].includes(k)) ?? Object.keys(winner.parsed_metrics ?? {})[0] : undefined;
+  const winnerScore = (metricKey && winner?.parsed_metrics?.[metricKey] as number) ?? 0;
+  const loserScore = (metricKey && loser?.parsed_metrics?.[metricKey] as number) ?? 0;
+  const metricName = metricKey?.toUpperCase().replace(/_/g, "-") ?? "METRIC";
+  const justification = isOverridden
+    ? `You manually selected '${winner?.architecture_name}' — overriding the AI recommendation.`
+    : (jobData?.winning_justification ?? "Selected based on highest held-out metric score across all validation folds.");
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}
@@ -88,69 +98,117 @@ export default function ModelSelectionView({ experiments, jobData, onApprove, lo
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-5">
-        {/* Winner */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: -6 }} transition={{ duration: 0.55 }}
-          className="col-span-12 lg:col-span-8 glass-strong rounded-2xl p-6 relative"
-          style={{ boxShadow: "0 0 0 1px rgba(251,191,36,.6), 0 0 48px -6px rgba(251,191,36,.5)" }}>
-          <div className="flex items-start justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-accent-gold/15 border border-accent-gold/40 flex items-center justify-center text-accent-gold">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              </div>
-              <div>
-                <div className="text-[20px] font-semibold tracking-tight">{winner?.architecture_name ?? "Best model"}</div>
-                <div className="font-mono text-[12px] text-ink-400 mt-0.5">{winner?.architecture_name?.toLowerCase()}</div>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="eyebrow">{metricName}</div>
-              <div className="font-mono font-semibold text-[40px] leading-none text-accent-emerald mt-1.5">
-                <CountUp to={winnerScore} decimals={4} />
-              </div>
-            </div>
-          </div>
+      {/* Two equal clickable cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+        {[aiWinner, loser].filter(Boolean).map((exp, idx) => {
+          if (!exp) return null;
+          const isAiPick = exp.experiment_id === aiWinner?.experiment_id;
+          const isSelected = selected?.experiment_id === exp.experiment_id;
+          const score = metricKey ? (exp.parsed_metrics?.[metricKey] as number) ?? 0 : 0;
 
-          <div className="rounded-lg bg-accent-emerald/5 border border-accent-emerald/25 px-4 py-3.5">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="dot bg-accent-emerald" />
-              <div className="eyebrow text-accent-emerald">Justification</div>
-            </div>
-            <div className="text-[13px] text-ink-200 leading-relaxed font-mono">
-              <TypeIn text={justification} />
-            </div>
-          </div>
-        </motion.div>
+          return (
+            <motion.div
+              key={exp.experiment_id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: idx * 0.1 }}
+              onClick={() => setSelected(exp)}
+              className="rounded-2xl p-5 border cursor-pointer relative transition-all select-none"
+              style={{
+                background: isSelected
+                  ? isAiPick ? "rgba(251,191,36,.06)" : "rgba(59,130,246,.06)"
+                  : "rgba(15,23,42,.5)",
+                borderColor: isSelected
+                  ? isAiPick ? "rgba(251,191,36,.6)" : "rgba(59,130,246,.55)"
+                  : "rgba(55,65,81,.5)",
+                boxShadow: isSelected
+                  ? isAiPick ? "0 0 0 1px rgba(251,191,36,.4), 0 0 40px -8px rgba(251,191,36,.3)" : "0 0 0 1px rgba(59,130,246,.4), 0 0 40px -8px rgba(59,130,246,.25)"
+                  : "none",
+              }}>
 
-        {/* Loser */}
-        {loser && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 0.55, y: 4, scale: 0.97 }} transition={{ duration: 0.55, delay: 0.1 }}
-            className="col-span-12 lg:col-span-4 rounded-2xl p-5 bg-ink-900/40 border border-ink-700/60 relative">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-ink-800 border border-ink-700 flex items-center justify-center text-ink-500">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              {/* Badges */}
+              <div className="absolute -top-2.5 left-4 flex items-center gap-2">
+                {isAiPick && (
+                  <span className="px-2 py-0.5 rounded-full bg-accent-gold/15 border border-accent-gold/40 text-accent-gold text-[9px] font-mono uppercase tracking-widest flex items-center gap-1">
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                    AI pick
+                  </span>
+                )}
+                {!isAiPick && (
+                  <span className="px-2 py-0.5 rounded-full bg-ink-800 border border-ink-700 text-ink-500 text-[9px] font-mono uppercase">runner-up</span>
+                )}
               </div>
-              <div>
-                <div className="text-[15px] font-medium text-ink-300">{loser.architecture_name}</div>
-                <div className="font-mono text-[11px] text-ink-500 mt-0.5">{loser.architecture_name?.toLowerCase()}</div>
+
+              <div className="flex items-start justify-between mt-1">
+                <div className="flex items-center gap-3">
+                  {/* Radio circle */}
+                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all"
+                    style={{ borderColor: isSelected ? (isAiPick ? "#FBBF24" : "#3B82F6") : "rgba(75,85,99,1)" }}>
+                    {isSelected && (
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: isAiPick ? "#FBBF24" : "#3B82F6" }} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[16px] font-semibold tracking-tight text-ink-100">{exp.architecture_name}</div>
+                    <div className="font-mono text-[11px] text-ink-500 mt-0.5">{exp.architecture_name?.toLowerCase()}</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="eyebrow text-[8.5px]">{metricName}</div>
+                  <div className="font-mono font-semibold text-[26px] leading-none mt-1"
+                    style={{ color: isSelected ? (isAiPick ? "#FBBF24" : "#60A5FA") : "#6B7280" }}>
+                    {isSelected ? <CountUp to={score} decimals={4} /> : score.toFixed(4)}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">{metricName}</span><span className="font-mono text-[15px] text-ink-400">{loserScore.toFixed(4)}</span></div>
-              <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">retries</span><span className={`font-mono text-[15px] ${loser.retry_count > 0 ? "text-accent-amber" : "text-ink-400"}`}>{loser.retry_count} / 3</span></div>
-              <div className="flex items-center justify-between"><span className="eyebrow text-[9.5px]">verdict</span><span className="text-[11px] text-ink-500">underperformed</span></div>
-            </div>
-            <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-ink-800 border border-ink-700 text-ink-500 text-[10px] font-mono uppercase">archived</div>
-          </motion.div>
-        )}
+
+              <div className="mt-4 grid grid-cols-3 gap-2 pt-3 border-t border-ink-800/50">
+                {[
+                  { label: "retries", value: `${exp.retry_count ?? 0} / 3`, warn: (exp.retry_count ?? 0) > 0 },
+                  { label: "status", value: exp.success ? "success" : "failed", warn: !exp.success },
+                  { label: "experiment", value: idx === 0 ? "A" : "B", warn: false },
+                ].map(({ label, value, warn }) => (
+                  <div key={label}>
+                    <div className="eyebrow text-[8.5px] mb-0.5">{label}</div>
+                    <div className={`font-mono text-[13px] ${warn ? "text-accent-amber" : "text-ink-400"}`}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {isSelected && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}
+                  className="mt-3 flex items-center gap-1.5 text-[10.5px] font-mono"
+                  style={{ color: isAiPick ? "#FBBF24" : "#60A5FA" }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12.5L10 17L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  {isAiPick ? "AI recommended · currently selected" : "Manual override · currently selected"}
+                </motion.div>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4 }}
-        className="flex items-center justify-between mt-6">
+      {/* Justification panel */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+        className={`rounded-xl px-5 py-4 mb-5 border ${isOverridden ? "bg-accent-blue/5 border-accent-blue/25" : "bg-accent-emerald/5 border-accent-emerald/25"}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className={`dot ${isOverridden ? "bg-accent-blueGlow" : "bg-accent-emerald"}`} />
+          <div className={`eyebrow text-[9px] ${isOverridden ? "text-accent-blueGlow" : "text-accent-emerald"}`}>
+            {isOverridden ? "Manual override" : "Justification"}
+          </div>
+        </div>
+        <div className="text-[13px] text-ink-200 leading-relaxed font-mono">
+          <TypeIn key={justification} text={justification} />
+        </div>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2 }}
+        className="flex items-center justify-between">
         <div className="text-[12px] text-ink-400">
           Approving will package <span className="font-mono text-ink-200">model.pkl</span>, generate <span className="font-mono text-ink-200">endpoint.py</span>, and prepare deployment steps.
+          {isOverridden && <span className="ml-2 text-accent-blueGlow">Using manually selected model.</span>}
         </div>
-        <button onClick={onApprove} disabled={loading}
+        <button onClick={() => onApprove(isOverridden ? winner?.experiment_id : undefined)} disabled={loading}
           className="inline-flex items-center gap-2 px-5 py-3 rounded-md font-medium text-[14px] tracking-tight border transition-all active:scale-[.98] disabled:opacity-40 bg-accent-emerald hover:bg-accent-emeraldDim border-accent-emerald/40 text-white shadow-glow-emerald">
           {loading ? (
             <svg width="14" height="14" viewBox="0 0 24 24" className="spin-slow"><circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,.3)" strokeWidth="2" fill="none"/><path d="M12 3a9 9 0 0 1 9 9" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>

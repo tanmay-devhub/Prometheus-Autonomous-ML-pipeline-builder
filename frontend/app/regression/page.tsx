@@ -120,6 +120,17 @@ export default function RegressionPage() {
     finally { setPolling(false); }
   }, [jobId, profileData, modelCardData, endpointData]);
 
+  // Support ?job=<id> URL param (from auto-detect landing page)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const jobFromUrl = params.get("job");
+    if (jobFromUrl) {
+      setJobId(jobFromUrl);
+      setView("experiments");
+      setJobData({ current_phase: "initializing" });
+    }
+  }, []);
+
   const isTerminal = view === "endpoint" || view === "failed";
   useEffect(() => {
     if (!jobId || isTerminal || view === "upload") return;
@@ -136,10 +147,10 @@ export default function RegressionPage() {
     setJobId(id); setView("experiments"); setJobData({ current_phase: "initializing" });
   };
   const handleProblemApproved = () => setView("profiling");
-  const handleModelApprove = async () => {
+  const handleModelApprove = async (selectedId?: string) => {
     if (!jobId) return;
     setApproveLoading(true);
-    try { await approveModel(jobId, true); setView("results"); }
+    try { await approveModel(jobId, true, selectedId); setView("results"); }
     finally { setApproveLoading(false); }
   };
 

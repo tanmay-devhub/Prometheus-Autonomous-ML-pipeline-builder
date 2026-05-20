@@ -17,11 +17,18 @@ const METRICS: Record<string, { value: string; label: string }[]> = {
     { value: "rmse", label: "RMSE" },
     { value: "mae",  label: "MAE" },
   ],
+  multiclass_classification: [
+    { value: "f1_macro",    label: "F1 Macro" },
+    { value: "f1_weighted", label: "F1 Weighted" },
+    { value: "accuracy",    label: "Accuracy" },
+    { value: "log_loss",    label: "Log-loss" },
+  ],
 };
 
 const DEFAULT_METRIC: Record<string, string> = {
   binary_classification: "roc_auc",
   regression: "r2",
+  multiclass_classification: "f1_macro",
 };
 
 interface Props {
@@ -79,6 +86,7 @@ export default function ApprovalGate({ jobId, taskType, targetColumn, metric, al
 
   const metricOptions = METRICS[task] ?? METRICS.binary_classification;
   const isRegression = task === "regression";
+  const isMulticlass = task === "multiclass_classification";
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}
@@ -103,6 +111,7 @@ export default function ApprovalGate({ jobId, taskType, targetColumn, metric, al
                 className="bg-ink-850 border border-ink-700 rounded-md px-3 py-1.5 text-[12.5px] text-ink-100 hover:border-accent-blue/40 transition-colors">
                 <option value="binary_classification">Binary Classification</option>
                 <option value="regression">Regression</option>
+                <option value="multiclass_classification">Multiclass Classification</option>
               </select>
             </Field>
             <Field label="Target Column">
@@ -158,6 +167,12 @@ export default function ApprovalGate({ jobId, taskType, targetColumn, metric, al
                 <span className="text-ink-100 font-medium">Regression mode:</span> predicts a continuous numeric value.
                 {" "}Optimizing for <span className="font-mono text-accent-blueGlow">{selectedMetric.toUpperCase()}</span>.
                 {" "}Use this for price prediction, forecasting, or any continuous target.
+              </>
+            ) : isMulticlass ? (
+              <>
+                <span className="text-ink-100 font-medium">Multiclass classification mode:</span> predicts one of 3+ categories.
+                {" "}Optimizing for <span className="font-mono text-accent-blueGlow">{selectedMetric.replace("_", " ")}</span>.
+                {" "}Use this for wine quality, news topics, species classification, customer tiers, etc.
               </>
             ) : (
               <>

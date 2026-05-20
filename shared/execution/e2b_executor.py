@@ -89,9 +89,15 @@ class E2BExecutor:
                             "mae", "r2", "rmse",
                             "rmse_pct_of_mean", "within_10_pct", "within_15_pct", "within_20_pct",
                             "target_mean", "target_log_transformed",
+                            # multiclass extras
+                            "accuracy", "f1_macro", "f1_weighted", "num_classes",
                         ):
                             if extra in output_json:
                                 parsed_metrics[extra] = output_json[extra]
+                        # Capture dict/list fields for multiclass
+                        for extra_complex in ("per_class_f1", "class_names"):
+                            if extra_complex in output_json:
+                                parsed_metrics[extra_complex] = output_json[extra_complex]
                         success = True
                 except json.JSONDecodeError:
                     error_type = "OutputParseError"

@@ -180,7 +180,7 @@ export default function TestModelPanel({ jobId, featureColumns, targetColumn, ta
     setRunning(true); setResult(null); setError("");
     const payload = overrideInputs ?? inputs;
     try {
-      const res = await fetch(`http://localhost:8000/jobs/${jobId}/test-predict`, {
+      const res = await fetch(`http://localhost:8000/classification/jobs/${jobId}/test-predict`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -252,7 +252,7 @@ export default function TestModelPanel({ jobId, featureColumns, targetColumn, ta
     setRipple({ x: e.clientX - rect.left, y: e.clientY - rect.top, id: Date.now() + 1 });
     setRunning(true); setError("");
     try {
-      const res = await fetch(`http://localhost:8000/jobs/${jobId}/test-predict`, {
+      const res = await fetch(`http://localhost:8000/classification/jobs/${jobId}/test-predict`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newInputs),
       });

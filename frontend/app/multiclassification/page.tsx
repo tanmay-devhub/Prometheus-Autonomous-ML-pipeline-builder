@@ -9,15 +9,15 @@ import ProfileView from "../components/ProfileView";
 import ExperimentPanel from "../components/ExperimentPanel";
 import ModelSelectionView from "../components/ModelSelectionView";
 import DebugLog from "../components/DebugLog";
-import ModelCard from "../components/ModelCard";
+import MultiClassModelCard from "../components/multiclassification/MultiClassModelCard";
 import EndpointViewer from "../components/EndpointViewer";
 import PipelineProgress from "../components/PipelineProgress";
-import TestModelPanel from "../components/TestModelPanel";
+import PredictionTester from "../components/multiclassification/PredictionTester";
 import {
   getJobStatus, getFullJob, getProfile, getExperiments,
   getDebugLog, getModelCard, getEndpointCode, getExplanation, approveModel,
   createJob, approveProblem,
-} from "@/lib/classification-api";
+} from "@/lib/multiclassification-api";
 
 type View = "upload" | "awaiting_problem_approval" | "profiling" | "experiments" | "awaiting_model_approval" | "results" | "endpoint" | "failed";
 
@@ -38,7 +38,7 @@ function TopBar({ jobId, polling, onReset }: { jobId: string | null; polling: bo
     <div className="flex items-center justify-between px-8 pt-5 pb-2 shrink-0">
       <div className="flex items-center gap-3">
         <button onClick={() => router.push("/")} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-blue to-accent-violet flex items-center justify-center shadow-glow-blue">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-amber to-accent-rose flex items-center justify-center">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
               <path d="M12 2L4 7L4 17L12 22L20 17L20 7Z" stroke="white" strokeWidth="1.5" fill="none"/>
               <path d="M12 2L12 22M4 7L20 17M20 7L4 17" stroke="white" strokeWidth="1" opacity=".6"/>
@@ -46,7 +46,7 @@ function TopBar({ jobId, polling, onReset }: { jobId: string | null; polling: bo
           </div>
           <div>
             <div className="text-[13px] font-semibold tracking-tight">Prometheus</div>
-            <div className="eyebrow text-[9.5px] -mt-px text-accent-blueGlow">classification</div>
+            <div className="eyebrow text-[9.5px] -mt-px text-accent-amber">multi-class</div>
           </div>
         </button>
         {jobId && (
@@ -70,7 +70,7 @@ function TopBar({ jobId, polling, onReset }: { jobId: string | null; polling: bo
         <div className="flex items-center gap-2 text-ink-400">
           <svg width="13" height="13" viewBox="0 0 24 24" className={polling ? "spin-slow" : ""}>
             <circle cx="12" cy="12" r="9" stroke="rgba(148,163,184,.2)" strokeWidth="2" fill="none"/>
-            <path d="M12 3a9 9 0 0 1 9 9" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" fill="none"/>
+            <path d="M12 3a9 9 0 0 1 9 9" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" fill="none"/>
           </svg>
           <span className="eyebrow text-[9.5px]">{polling ? "polling / 3s" : "idle"}</span>
         </div>
@@ -79,7 +79,7 @@ function TopBar({ jobId, polling, onReset }: { jobId: string | null; polling: bo
   );
 }
 
-export default function ClassificationPage() {
+export default function MultiClassificationPage() {
   const router = useRouter();
   const [jobId, setJobId] = useState<string | null>(null);
   const [view, setView] = useState<View>("upload");
@@ -173,8 +173,8 @@ export default function ClassificationPage() {
               <UploadPanel
                 onJobCreated={handleJobCreated}
                 createJobFn={createJob}
-                taskLabel="binary classification"
-                taskDescription="Predict categories: Yes/No, survived/died, disease/healthy"
+                taskLabel="multi-class classification"
+                taskDescription="Predict one of 3+ categories: wine quality, news topics, customer segments"
               />
             )}
 
@@ -227,12 +227,23 @@ export default function ClassificationPage() {
                     <div className="text-[26px] font-semibold tracking-tight mt-1">Generating outputs</div>
                     <div className="text-ink-400 text-[13.5px] mt-1.5">Building model card, SHAP analysis, and endpoint...</div>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-blue/10 border border-accent-blue/30 text-accent-blueGlow">
-                    <span className="dot bg-accent-blueGlow pulse-dot" /><span className="text-[11px] font-mono">processing</span>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-amber/10 border border-accent-amber/30 text-accent-amber">
+                    <span className="dot bg-accent-amber pulse-dot" /><span className="text-[11px] font-mono">processing</span>
                   </div>
                 </div>
                 {modelCardData && explanationData && (
-                  <ModelCard modelCard={modelCardData.model_card} plainExplanation={explanationData.plain_english_explanation} shapFeatures={explanationData.shap_features} winningJustification={explanationData.winning_justification} />
+                  <MultiClassModelCard
+                    modelCard={modelCardData.model_card}
+                    plainExplanation={explanationData.plain_english_explanation}
+                    shapFeatures={explanationData.shap_features}
+                    winningJustification={explanationData.winning_justification}
+                    perClassMetrics={explanationData.per_class_metrics}
+                    classNames={explanationData.class_names ?? jobData?.class_names ?? []}
+                    numClasses={explanationData.num_classes ?? jobData?.num_classes}
+                    accuracy={explanationData.accuracy}
+                    f1Macro={explanationData.f1_macro}
+                    f1Weighted={explanationData.f1_weighted}
+                  />
                 )}
                 <DebugLog debugLog={debugLog} />
               </motion.div>
@@ -244,7 +255,7 @@ export default function ClassificationPage() {
                   <div>
                     <div className="eyebrow">07 . complete</div>
                     <div className="text-[26px] font-semibold tracking-tight mt-1">Pipeline complete</div>
-                    <div className="text-ink-400 text-[13.5px] mt-1.5">Your classifier is trained, packaged, and ready to call.</div>
+                    <div className="text-ink-400 text-[13.5px] mt-1.5">Your multi-class classifier is trained, packaged, and ready to call.</div>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-emerald/10 border border-accent-emerald/40 text-accent-emerald">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12.5L10 17L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -252,11 +263,30 @@ export default function ClassificationPage() {
                   </div>
                 </div>
                 {jobData && (
-                  <TestModelPanel jobId={jobId!} featureColumns={(jobData.dataset_columns ?? []).filter((c: string) => c !== jobData.target_column)} targetColumn={jobData.target_column ?? "target"} taskType={jobData.task_type} sampleRow={jobData.dataset_sample_rows?.[0]} sampleRows={jobData.dataset_sample_rows ?? []} heldOutRows={jobData.dataset_held_out_rows ?? []} />
+                  <PredictionTester
+                    jobId={jobId!}
+                    featureColumns={(jobData.dataset_columns ?? []).filter((c: string) => c !== jobData.target_column)}
+                    targetColumn={jobData.target_column ?? "target"}
+                    classNames={jobData.class_names ?? []}
+                    sampleRow={jobData.dataset_sample_rows?.[0]}
+                    sampleRows={jobData.dataset_sample_rows ?? []}
+                    heldOutRows={jobData.dataset_held_out_rows ?? []}
+                  />
                 )}
                 {endpointData && <EndpointViewer endpointCode={endpointData.endpoint_code} requirements={endpointData.requirements} jobId={jobId!} />}
                 {modelCardData && explanationData && (
-                  <ModelCard modelCard={modelCardData.model_card} plainExplanation={explanationData.plain_english_explanation} shapFeatures={explanationData.shap_features} winningJustification={explanationData.winning_justification} />
+                  <MultiClassModelCard
+                    modelCard={modelCardData.model_card}
+                    plainExplanation={explanationData.plain_english_explanation}
+                    shapFeatures={explanationData.shap_features}
+                    winningJustification={explanationData.winning_justification}
+                    perClassMetrics={explanationData.per_class_metrics}
+                    classNames={explanationData.class_names ?? jobData?.class_names ?? []}
+                    numClasses={explanationData.num_classes ?? jobData?.num_classes}
+                    accuracy={explanationData.accuracy}
+                    f1Macro={explanationData.f1_macro}
+                    f1Weighted={explanationData.f1_weighted}
+                  />
                 )}
                 <DebugLog debugLog={debugLog} />
               </motion.div>
@@ -276,9 +306,6 @@ export default function ClassificationPage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-4 rounded-xl bg-accent-rose/8 border border-accent-rose/30 px-5 py-4 mb-6">
-                  <div className="w-10 h-10 rounded-lg bg-accent-rose/15 border border-accent-rose/40 flex items-center justify-center text-accent-rose shrink-0">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3L22 20H2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/><path d="M12 10v4M12 17v.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-                  </div>
                   <div className="flex-1">
                     <div className="text-[14px] font-semibold text-accent-rose">All experiments failed</div>
                     <div className="text-[12.5px] text-ink-300 mt-1">{jobData?.error_message || "Check the debug log for details."}</div>
