@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { approveProblem } from "@/lib/api";
+import { motion } from "framer-motion";
+import { approveProblem as defaultApproveProblem } from "@/lib/api";
 
 const METRICS: Record<string, { value: string; label: string }[]> = {
   binary_classification: [
@@ -34,19 +34,15 @@ interface Props {
   leakageWarnings: string[];
   onApproved: () => void;
   onReset?: () => void;
+  approveProblemFn?: typeof defaultApproveProblem;
 }
 
-export default function ApprovalGate({ jobId, taskType, targetColumn, metric, allColumns, validationWarnings, leakageWarnings, onApproved, onReset }: Props) {
+export default function ApprovalGate({ jobId, taskType, targetColumn, metric, allColumns, validationWarnings, leakageWarnings, onApproved, onReset, approveProblemFn }: Props) {
+  const approveProblem = approveProblemFn ?? defaultApproveProblem;
   const [task, setTask] = useState(taskType || "binary_classification");
   const [target, setTarget] = useState(targetColumn || "");
   const [selectedMetric, setSelectedMetric] = useState(metric || DEFAULT_METRIC[taskType] || "roc_auc");
   const [loading, setLoading] = useState(false);
-  const [showRegressionModal, setShowRegressionModal] = useState(taskType === "regression");
-
-  // Show modal whenever task switches to regression
-  useEffect(() => {
-    if (task === "regression") setShowRegressionModal(true);
-  }, [task]);
 
   // Auto-switch metric when task type changes
   useEffect(() => {
@@ -74,11 +70,6 @@ export default function ApprovalGate({ jobId, taskType, targetColumn, metric, al
     if (onReset) onReset(); else window.location.reload();
   };
 
-  const handleSwitchToClassification = () => {
-    setTask("binary_classification");
-    setShowRegressionModal(false);
-  };
-
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="flex items-center justify-between py-3 border-b border-ink-800 last:border-b-0">
       <div className="eyebrow">{label}</div>
@@ -90,70 +81,7 @@ export default function ApprovalGate({ jobId, taskType, targetColumn, metric, al
   const isRegression = task === "regression";
 
   return (
-    <>
-      {/* Regression not-supported modal */}
-      <AnimatePresence>
-        {showRegressionModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.94, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 8 }}
-              transition={{ duration: 0.25 }}
-              className="relative w-full max-w-[440px] mx-4 rounded-2xl glass-strong border border-ink-700 p-7 shadow-2xl"
-            >
-              {/* Icon */}
-              <div className="w-12 h-12 rounded-xl bg-accent-amber/15 border border-accent-amber/30 flex items-center justify-center mb-5">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="text-accent-amber">
-                  <path d="M12 3L22 20H2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-                  <path d="M12 10v4M12 17v.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                </svg>
-              </div>
-
-              <div className="eyebrow text-accent-amber mb-2">v1 limitation</div>
-              <div className="text-[18px] font-semibold tracking-tight mb-3">
-                Regression not available
-              </div>
-              <p className="text-[13px] text-ink-300 leading-relaxed mb-1">
-                This version of Prometheus is configured for <span className="text-ink-100 font-medium">binary classification</span> only.
-              </p>
-              <p className="text-[13px] text-ink-400 leading-relaxed mb-7">
-                Regression support will be added in the next version.
-              </p>
-
-              <div className="flex flex-col gap-2.5">
-                <button
-                  onClick={handleSwitchToClassification}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-[13px] tracking-tight border transition-all active:scale-[.98] bg-accent-blue hover:bg-accent-blueDim border-accent-blue/40 text-white shadow-glow-blue"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12.5L10 17L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Switch to Binary Classification
-                </button>
-                <button
-                  onClick={handleReject}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-[13px] tracking-tight border transition-all active:scale-[.98] bg-transparent border-ink-700 text-ink-300 hover:border-ink-500 hover:text-ink-100"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M3 3v5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Start New Job
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}
         className="max-w-[860px] w-full mx-auto px-8 py-8">
         <div className="flex items-end justify-between mb-6">
           <div>
@@ -249,7 +177,7 @@ export default function ApprovalGate({ jobId, taskType, targetColumn, metric, al
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
               Reject
             </button>
-            <button onClick={handleApprove} disabled={loading || isRegression}
+            <button onClick={handleApprove} disabled={loading}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md font-medium text-[13px] tracking-tight border transition-all active:scale-[.98] disabled:opacity-40 bg-accent-emerald hover:bg-accent-emeraldDim border-accent-emerald/40 text-white shadow-glow-emerald">
               {loading ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" className="spin-slow"><circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,.3)" strokeWidth="2" fill="none"/><path d="M12 3a9 9 0 0 1 9 9" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>
@@ -261,6 +189,5 @@ export default function ApprovalGate({ jobId, taskType, targetColumn, metric, al
           </div>
         </div>
       </motion.div>
-    </>
   );
 }

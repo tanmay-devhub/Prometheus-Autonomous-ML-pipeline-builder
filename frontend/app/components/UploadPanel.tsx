@@ -2,11 +2,17 @@
 
 import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { createJob } from "@/lib/api";
+import { createJob as defaultCreateJob } from "@/lib/api";
 
 const fadeUp = { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.45 } };
 
-export default function UploadPanel({ onJobCreated }: { onJobCreated: (id: string) => void }) {
+export default function UploadPanel({ onJobCreated, createJobFn, taskLabel, taskDescription }: {
+  onJobCreated: (id: string) => void;
+  createJobFn?: typeof defaultCreateJob;
+  taskLabel?: string;
+  taskDescription?: string;
+}) {
+  const createJob = createJobFn ?? defaultCreateJob;
   const [file, setFile] = useState<File | null>(null);
   const [description, setDescription] = useState("");
   const [dragging, setDragging] = useState(false);

@@ -34,7 +34,11 @@ frontend/.env.production
 *.sqlite3
 mlruns/
 artifacts/
+artifacts/classification/
+artifacts/regression/
 uploads/
+uploads/classification/
+uploads/regression/
 *.pkl
 *.joblib
 *.h5
@@ -111,5 +115,10 @@ tmp/
 *.orig
 *.rej
 
-# ── Claude Code (AI assistant project files) ──────────────────
-.claude/
+# ── Prometheus runtime files ──────────────────────────────────
+celerybeat-schedule.db
+classification.db
+regression.db
+prometheus.db
+shared.db
+mlflow.db
