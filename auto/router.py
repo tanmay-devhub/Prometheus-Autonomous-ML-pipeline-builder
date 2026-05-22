@@ -27,10 +27,11 @@ Choose exactly one task type:
 - "binary_classification" — target has exactly 2 distinct values (Yes/No, 0/1, survived/died, etc.)
 - "multiclass_classification" — target has 3 to 20 distinct categorical labels (species, quality grades, news categories, etc.)
 - "regression" — target is a continuous numeric variable (prices, temperatures, salaries, scores, etc.)
+- "timeseries" — dataset has a date/time column AND the goal is to forecast future values over time (stock prices, sales, temperatures, traffic, energy)
 
 Return JSON:
 {{
-  "task_type": "binary_classification" | "multiclass_classification" | "regression",
+  "task_type": "binary_classification" | "multiclass_classification" | "regression" | "timeseries",
   "target_column": "<exact column name from the dataset>",
   "reasoning": "<one sentence explaining why>",
   "confidence": 0.0-1.0
@@ -193,6 +194,46 @@ async def auto_create_job(
             "class_distribution": class_distribution,
             "num_classes": num_classes, "class_names": class_names,
             "imbalanced_classes": [], "per_class_metrics": None, "encoding_map": None,
+            "architectures": [], "experiment_results": [], "current_retry_count": 0,
+            "winning_experiment": None, "winning_justification": None,
+            "model_card": None, "shap_plot_path": None,
+            "generated_endpoint_code": None, "generated_requirements": None,
+            "plain_english_explanation": None,
+            "current_phase": "initializing", "error_message": None, "debug_log": [],
+        }
+        save_job(job_id, initial_state)
+        run_pipeline_task.delay(job_id)
+
+    elif task_type == "timeseries":
+        from timeseries.config import UPLOAD_DIR, ARTIFACTS_DIR
+        from timeseries.db import save_job
+        from timeseries.tasks import run_pipeline_task
+        redirect_to = "timeseries"
+
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        os.makedirs(ARTIFACTS_DIR, exist_ok=True)
+        dataset_path = os.path.join(UPLOAD_DIR, f"{job_id}.csv")
+        with open(dataset_path, "wb") as f:
+            f.write(contents)
+
+        sample_rows_ts = _rows(df.head(5))
+        held_out_rows_ts = _rows(df.tail(min(20, len(df))))
+
+        initial_state = {
+            "job_id": job_id, "user_description": description,
+            "dataset_path": dataset_path, "dataset_columns": columns,
+            "dataset_sample_rows": sample_rows_ts,
+            "dataset_held_out_rows": held_out_rows_ts,
+            "dataset_row_count": len(df),
+            "task_type": None, "date_column": None, "target_column": None,
+            "evaluation_metric": None, "domain_flags": [], "problem_analysis_raw": None,
+            "problem_approved": False, "model_approved": False,
+            "frequency": None, "forecast_horizon": 30, "sequence_length": 14,
+            "has_seasonality": False, "has_trend": False, "is_stationary": True,
+            "lag_features_used": [], "rolling_features_used": [],
+            "train_cutoff_date": None, "test_cutoff_date": None,
+            "forecast_values": None, "forecast_dates": None,
+            "profile_report": None, "validation_warnings": [], "leakage_warnings": [],
             "architectures": [], "experiment_results": [], "current_retry_count": 0,
             "winning_experiment": None, "winning_justification": None,
             "model_card": None, "shap_plot_path": None,

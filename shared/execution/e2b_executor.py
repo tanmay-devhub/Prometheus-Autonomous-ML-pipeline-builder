@@ -20,6 +20,7 @@ class ExecutionResult:
     error_message: Optional[str]
     execution_time_seconds: float
     model_pkl_b64: Optional[str] = None
+    forecast_values: Optional[list] = None
 
 
 class E2BExecutor:
@@ -59,11 +60,18 @@ class E2BExecutor:
             all_lines = [l.strip() for l in stdout.strip().split("\n") if l.strip()]
 
             _PKL_TAG = "__MODEL_PKL__:"
+            _FORECAST_TAG = "FORECAST:"
             model_pkl_b64: Optional[str] = None
+            forecast_values = None
             metric_lines = []
             for line in all_lines:
                 if line.startswith(_PKL_TAG):
                     model_pkl_b64 = line[len(_PKL_TAG):]
+                elif line.startswith(_FORECAST_TAG):
+                    try:
+                        forecast_values = json.loads(line[len(_FORECAST_TAG):])
+                    except Exception:
+                        pass
                 else:
                     metric_lines.append(line)
 
@@ -98,6 +106,17 @@ class E2BExecutor:
                         for extra_complex in ("per_class_f1", "class_names"):
                             if extra_complex in output_json:
                                 parsed_metrics[extra_complex] = output_json[extra_complex]
+                        # Capture timeseries string fields
+                        for ts_str in ("train_start_date", "train_end_date", "test_start_date", "test_end_date"):
+                            if ts_str in output_json:
+                                parsed_metrics[ts_str] = output_json[ts_str]
+                        # Capture timeseries numeric fields
+                        for ts_num in ("mae", "mape", "forecast_horizon"):
+                            if ts_num in output_json and ts_num not in parsed_metrics:
+                                parsed_metrics[ts_num] = output_json[ts_num]
+                        # Capture feature_columns list
+                        if "feature_columns" in output_json:
+                            parsed_metrics["feature_columns"] = output_json["feature_columns"]
                         success = True
                 except json.JSONDecodeError:
                     error_type = "OutputParseError"
@@ -114,6 +133,7 @@ class E2BExecutor:
                 error_message=error_message,
                 execution_time_seconds=time.time() - start_time,
                 model_pkl_b64=model_pkl_b64,
+                forecast_values=forecast_values,
             )
 
         except TimeoutError:

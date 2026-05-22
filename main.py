@@ -7,12 +7,14 @@ from regression.routers.jobs import router as reg_jobs_router
 from regression.routers.approvals import router as reg_approvals_router
 from multiclassification.routers.jobs import router as mc_jobs_router
 from multiclassification.routers.approvals import router as mc_approvals_router
+from timeseries.routers.jobs import router as ts_jobs_router
+from timeseries.routers.approvals import router as ts_approvals_router
 from auto.router import router as auto_router
 
 app = FastAPI(
     title="Prometheus",
-    description="Autonomous ML Pipeline Builder — classification, regression, and multiclass classification",
-    version="3.0.0",
+    description="Autonomous ML Pipeline Builder — classification, regression, multiclass classification, and time series forecasting",
+    version="4.0.0",
 )
 
 app.add_middleware(
@@ -29,6 +31,8 @@ app.include_router(reg_jobs_router, prefix="/regression")
 app.include_router(reg_approvals_router, prefix="/regression")
 app.include_router(mc_jobs_router, prefix="/multiclassification")
 app.include_router(mc_approvals_router, prefix="/multiclassification")
+app.include_router(ts_jobs_router, prefix="/timeseries")
+app.include_router(ts_approvals_router, prefix="/timeseries")
 app.include_router(auto_router)
 
 
@@ -36,12 +40,13 @@ app.include_router(auto_router)
 async def root():
     return {
         "message": "Prometheus API",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "docs": "/docs",
         "services": {
             "classification": "/classification/jobs",
             "regression": "/regression/jobs",
             "multiclassification": "/multiclassification/jobs",
+            "timeseries": "/timeseries/jobs",
             "auto": "/auto/jobs",
         },
     }

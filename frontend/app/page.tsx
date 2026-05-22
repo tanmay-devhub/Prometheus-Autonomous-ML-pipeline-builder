@@ -11,6 +11,7 @@ const TASK_LABELS: Record<string, { label: string; color: string; path: string }
   binary_classification:    { label: "Binary Classification",    color: "#3B82F6", path: "classification" },
   multiclass_classification: { label: "Multi-Class Classification", color: "#F59E0B", path: "multiclassification" },
   regression:               { label: "Regression",               color: "#8B5CF6", path: "regression" },
+  timeseries:               { label: "Time Series Forecasting",  color: "#10B981", path: "timeseries" },
 };
 
 function QuickStart() {
@@ -50,7 +51,7 @@ function QuickStart() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.25 }}
-      className="w-full max-w-[1100px] mt-6 rounded-2xl border border-ink-700/60 overflow-hidden"
+      className="w-full max-w-[1400px] mt-6 rounded-2xl border border-ink-700/60 overflow-hidden"
       style={{ background: "linear-gradient(135deg,rgba(15,23,42,.95),rgba(15,23,42,.80))" }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-6 py-4 border-b border-ink-700/50"
@@ -153,7 +154,7 @@ function QuickStart() {
               {/* Submit row */}
               <div className="md:col-span-2 flex items-center justify-between">
                 {error && <div className="text-[12px] text-accent-rose font-mono">{error}</div>}
-                {!error && <div className="text-[12px] text-ink-500">The AI will determine whether your problem is classification, multi-class, or regression.</div>}
+                {!error && <div className="text-[12px] text-ink-500">The AI will detect whether your problem is classification, multi-class, regression, or time series forecasting.</div>}
                 <button
                   onClick={handleSubmit}
                   disabled={!file || !description.trim()}
@@ -205,7 +206,7 @@ export default function Landing() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full max-w-[1100px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full max-w-[1400px]">
           {/* Classification Card */}
           <motion.button
             {...card}
@@ -318,10 +319,46 @@ export default function Landing() {
               </div>
             </div>
           </motion.button>
+
+          {/* Time Series Forecasting Card */}
+          <motion.button
+            {...card}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            onClick={() => router.push("/timeseries")}
+            className="group text-left rounded-2xl bg-ink-900/60 border border-ink-700 hover:border-accent-emerald/50 hover:bg-ink-800/60 p-7 transition-all duration-200 active:scale-[.98] relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-accent-emerald/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="w-12 h-12 rounded-xl bg-accent-emerald/10 border border-accent-emerald/30 flex items-center justify-center mb-5 text-accent-emerald group-hover:bg-accent-emerald/20 transition-colors">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 18l4-8 4 4 4-10 4 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 18h18" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity=".4"/>
+                  <circle cx="19" cy="10" r="1.5" fill="currentColor" opacity=".7"/>
+                </svg>
+              </div>
+              <div className="text-[18px] font-semibold tracking-tight mb-2">Time Series</div>
+              <div className="text-ink-400 text-[13px] leading-relaxed mb-5">
+                Forecast future values from historical sequences.
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {["Stock prices", "Sales demand", "Energy usage", "Traffic"].map(ex => (
+                  <span key={ex} className="px-2 py-1 rounded-md bg-ink-800 border border-ink-700 text-ink-300 text-[11px] font-mono">
+                    {ex}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-5 flex items-center gap-2 text-accent-emerald text-[12px] font-medium">
+                Start forecasting
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+                  <path d="M5 12h14M14 7l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </motion.button>
         </div>
 
         {/* Quick Start */}
-        <div className="w-full max-w-[1100px] flex items-center gap-4 mt-6">
+        <div className="w-full max-w-[1400px] flex items-center gap-4 mt-6">
           <div className="flex-1 h-px bg-ink-800" />
           <span className="text-[11px] text-ink-600 font-mono uppercase tracking-widest shrink-0">or let AI decide</span>
           <div className="flex-1 h-px bg-ink-800" />

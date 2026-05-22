@@ -37,10 +37,12 @@ artifacts/
 artifacts/classification/
 artifacts/regression/
 artifacts/multiclassification/
+artifacts/timeseries/
 uploads/
 uploads/classification/
 uploads/regression/
 uploads/multiclassification/
+uploads/timeseries/
 *.pkl
 *.joblib
 *.h5
@@ -125,3 +127,4 @@ multiclassification.db
 prometheus.db
 shared.db
 mlflow.db
+timeseries.db

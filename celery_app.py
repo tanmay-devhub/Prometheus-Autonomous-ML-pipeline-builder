@@ -10,7 +10,7 @@ celery_app = Celery(
     "prometheus",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["classification.tasks", "regression.tasks", "multiclassification.tasks"],
+    include=["classification.tasks", "regression.tasks", "multiclassification.tasks", "timeseries.tasks"],
 )
 
 celery_app.conf.update(
