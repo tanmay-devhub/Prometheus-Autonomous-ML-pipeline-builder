@@ -3,22 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ExperimentResult } from "@/lib/api";
-
-function CountUp({ to, decimals = 4 }: { to: number; decimals?: number }) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    const start = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / 1500);
-      setVal(to * (1 - Math.pow(1 - t, 3)));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [to]);
-  return <span>{val.toFixed(decimals)}</span>;
-}
+import CountUp from "./CountUp";
 
 function TypeIn({ text }: { text: string }) {
   const [out, setOut] = useState("");

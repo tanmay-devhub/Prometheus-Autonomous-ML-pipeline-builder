@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ScatterChart, Scatter, XAxis, YAxis, ReferenceLine,
   Tooltip, ResponsiveContainer, Cell, ZAxis,
 } from "recharts";
+import CountUp from "./CountUp";
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") + "/classification";
 
 // ── Normalize target values ("Yes"/"No", "True"/"False", 0/1, etc.) ───────────
 function normalizeTarget(val: any): number | null {
@@ -15,23 +18,6 @@ function normalizeTarget(val: any): number | null {
   if (s === "no"  || s === "false" || s === "0" || s === "0.0") return 0;
   const n = Number(val);
   return isNaN(n) ? null : n;
-}
-
-// ── CountUp ────────────────────────────────────────────────────────────────────
-function CountUp({ to, decimals = 1, suffix = "" }: { to: number; decimals?: number; suffix?: string }) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    const start = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / 900);
-      setVal(to * (1 - Math.pow(1 - t, 3)));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [to]);
-  return <span>{val.toFixed(decimals)}{suffix}</span>;
 }
 
 // ── Prediction history entry ────────────────────────────────────────────────────
@@ -180,7 +166,7 @@ export default function TestModelPanel({ jobId, featureColumns, targetColumn, ta
     setRunning(true); setResult(null); setError("");
     const payload = overrideInputs ?? inputs;
     try {
-      const res = await fetch(`http://localhost:8000/classification/jobs/${jobId}/test-predict`, {
+      const res = await fetch(`${API_BASE}/jobs/${jobId}/test-predict`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -252,7 +238,7 @@ export default function TestModelPanel({ jobId, featureColumns, targetColumn, ta
     setRipple({ x: e.clientX - rect.left, y: e.clientY - rect.top, id: Date.now() + 1 });
     setRunning(true); setError("");
     try {
-      const res = await fetch(`http://localhost:8000/classification/jobs/${jobId}/test-predict`, {
+      const res = await fetch(`${API_BASE}/jobs/${jobId}/test-predict`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newInputs),
       });

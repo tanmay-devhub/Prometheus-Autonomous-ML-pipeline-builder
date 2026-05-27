@@ -3,23 +3,7 @@
 import { useEffect, useRef, useLayoutEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ExperimentResult } from "@/lib/api";
-
-function CountUp({ to, decimals = 4 }: { to: number; decimals?: number }) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    const start = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / 1200);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setVal(to * eased);
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [to]);
-  return <span>{val.toFixed(decimals)}</span>;
-}
+import CountUp from "./CountUp";
 
 function TerminalLog({ lines, running }: { lines: { kind: string; text: string }[]; running: boolean }) {
   const ref = useRef<HTMLDivElement>(null);

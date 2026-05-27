@@ -35,7 +35,7 @@ function phaseToView(phase: string): View {
 function TopBar({ jobId, polling, onReset }: { jobId: string | null; polling: boolean; onReset: () => void }) {
   const router = useRouter();
   return (
-    <div className="flex items-center justify-between px-8 pt-5 pb-2 shrink-0">
+    <div className="sticky top-0 z-50 flex items-center justify-between px-8 py-3 shrink-0 bg-ink-950/80 backdrop-blur-md border-b border-ink-800/40">
       <div className="flex items-center gap-3">
         <button onClick={() => router.push("/")} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-amber to-accent-rose flex items-center justify-center">
@@ -104,19 +104,19 @@ export default function MultiClassificationPage() {
       setJobData(full);
 
       if (["profiling", "experiments", "awaiting_model_approval", "results", "endpoint"].includes(newView)) {
-        if (!profileData) { try { setProfileData(await getProfile(jobId)); } catch {} }
+        if (!profileData) { try { setProfileData(await getProfile(jobId)); } catch (err) { console.error("profile fetch:", err); } }
       }
       if (["experiments", "awaiting_model_approval", "results", "endpoint"].includes(newView)) {
-        try { const e = await getExperiments(jobId); setExperiments(e.experiment_results); } catch {}
-        try { const d = await getDebugLog(jobId); setDebugLog(d.debug_log); } catch {}
+        try { const e = await getExperiments(jobId); setExperiments(e.experiment_results); } catch (err) { console.error("experiments fetch:", err); }
+        try { const d = await getDebugLog(jobId); setDebugLog(d.debug_log); } catch (err) { console.error("debug log fetch:", err); }
       }
       if (["results", "endpoint"].includes(newView) && !modelCardData) {
-        try { setModelCardData(await getModelCard(jobId)); setExplanationData(await getExplanation(jobId)); } catch {}
+        try { setModelCardData(await getModelCard(jobId)); setExplanationData(await getExplanation(jobId)); } catch (err) { console.error("model card fetch:", err); }
       }
       if (newView === "endpoint" && !endpointData) {
-        try { setEndpointData(await getEndpointCode(jobId)); } catch {}
+        try { setEndpointData(await getEndpointCode(jobId)); } catch (err) { console.error("endpoint fetch:", err); }
       }
-    } catch {}
+    } catch (err) { console.error("poll status:", err); }
     finally { setPolling(false); }
   }, [jobId, profileData, modelCardData, endpointData]);
 

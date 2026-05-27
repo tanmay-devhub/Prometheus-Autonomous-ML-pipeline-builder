@@ -52,24 +52,24 @@ All results on truly held-out rows / test periods not seen during training, test
 
 ## Features
 
-- **Zero-code ML** — describe your problem in plain English, upload a CSV, done
-- **AI auto-detection** — the Quick Start panel detects task type (classification / regression / multi-class / time series) automatically from your data and description; no ML knowledge required
-- **Four task types** — binary classification, regression, multi-class classification (3–20 categories), and time series forecasting, each in a fully isolated module
-- **Autonomous debugging** — up to 3 retries with LLM-guided fixes; regenerates from scratch on repeated failures
-- **Smart preprocessing** — binary encoding, one-hot encoding, NaN-consistent imputation, class balancing, and automatic log-transform detection (regression)
-- **Time series feature engineering** — automatic lag features (t-1 through t-14), rolling means (7-day, 30-day), rolling std, and date features (day-of-week, month, quarter, is-weekend); always chronological split, never random
-- **Two human approval gates** — review problem analysis before training; review model results before deployment
-- **Runner-up override** — model selection screen shows both experiments as interactive radio cards; click either to select it before approving
-- **Forecast chart** — Recharts line chart showing blue (train actuals), green (test predictions), and orange dashed (forward forecast beyond the dataset) with a vertical train/test split line
-- **Forecast table** — next N predicted values with dates in a downloadable CSV table
-- **In-browser test panel** — classification shows confidence and correct/incorrect badge; multi-class shows per-class probability bars; regression shows formatted predicted value
-- **Per-class F1 breakdown** — multi-class results show individual F1 scores per class as animated progress bars
-- **Regression success metrics** — R², RMSE as % of target mean, and % predictions within 10%/15%/20% tolerance
-- **Dataset interpretation panel** — LLM insights rendered as styled, color-coded bullet-point cards
-- **Downloadable artifacts** — `endpoint.py` + `model.pkl` for self-hosting
-- **Full audit trail** — every agent decision, LLM call, retry, and fix logged in the debug log
-- **MLflow tracking** — all experiments tracked with parameters, metrics, and code snapshots
-- **Free-tier AI** — Ollama (local LLMs) + Gemini free tier; no paid API required
+- **Zero-code ML**: describe your problem in plain English, upload a CSV, done
+- **AI auto-detection**: the Quick Start panel detects task type (classification / regression / multi-class / time series) automatically from your data and description; no ML knowledge required
+- **Four task types**: binary classification, regression, multi-class classification (3–20 categories), and time series forecasting, each in a fully isolated module
+- **Autonomous debugging**: up to 3 retries with LLM-guided fixes; regenerates from scratch on repeated failures
+- **Smart preprocessing**: binary encoding, one-hot encoding, NaN-consistent imputation, class balancing, and automatic log-transform detection (regression)
+- **Time series feature engineering**: automatic lag features (t-1 through t-14), rolling means (7-day, 30-day), rolling std, and date features (day-of-week, month, quarter, is-weekend); always chronological split, never random
+- **Two human approval gates**: review problem analysis before training; review model results before deployment
+- **Runner-up override**: model selection screen shows both experiments as interactive radio cards; click either to select it before approving
+- **Forecast chart**: Recharts line chart showing blue (train actuals), green (test predictions), and orange dashed (forward forecast beyond the dataset) with a vertical train/test split line
+- **Forecast table**: next N predicted values with dates in a downloadable CSV table
+- **In-browser test panel**: classification shows confidence and correct/incorrect badge; multi-class shows per-class probability bars; regression shows formatted predicted value
+- **Per-class F1 breakdown**: multi-class results show individual F1 scores per class as animated progress bars
+- **Regression success metrics**: R², RMSE as % of target mean, and % predictions within 10%/15%/20% tolerance
+- **Dataset interpretation panel**: LLM insights rendered as styled, color-coded bullet-point cards
+- **Downloadable artifacts**: `endpoint.py` + `model.pkl` for self-hosting
+- **Full audit trail**: every agent decision, LLM call, retry, and fix logged in the debug log
+- **MLflow tracking**: all experiments tracked with parameters, metrics, and code snapshots
+- **Free-tier AI**: Ollama (local LLMs) + Gemini free tier; no paid API required
 
 ---
 
@@ -77,7 +77,7 @@ All results on truly held-out rows / test periods not seen during training, test
 
 ### Microservice layout
 
-All four task types share a **single FastAPI backend** on port 8000. Each task type lives in a completely isolated Python module — changes to one never affect the others. Shared utilities (LLM router, E2B executor) are imported exclusively from `shared/`.
+All four task types share a **single FastAPI backend** on port 8000. Each task type lives in a completely isolated Python module changes to one never affect the others. Shared utilities (LLM router, E2B executor) are imported exclusively from `shared/`.
 
 ```
 prometheus/
@@ -115,7 +115,7 @@ prometheus/
 ### Pipeline
 
 ```
-Upload CSV + description  (or use Quick Start — AI chooses the task type)
+Upload CSV + description  (or use Quick Start AI chooses the task type)
         │
         ▼
   problem_analyzer       ← llama3.1:8b infers task type, target column, metric
@@ -206,8 +206,8 @@ Upload CSV + description  (or use Quick Start — AI chooses the task type)
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/tanmay-devhub/Prometheus.git
-cd Prometheus/prometheus
+git clone https://github.com/tanmay-devhub/Prometheus-Autonomous-ML-pipeline-builder.git
+cd Prometheus-Autonomous-ML-pipeline-builder
 cp .env.example .env
 # Fill in GEMINI_API_KEY and E2B_API_KEY
 ```
@@ -239,22 +239,22 @@ start.bat
 **Manual (all platforms):**
 
 ```bash
-# Terminal 1 — Ollama
+# Terminal 1 Ollama
 ollama serve
 
-# Terminal 2 — Redis + MLflow
+# Terminal 2 Redis + MLflow
 docker-compose up -d
 
-# Terminal 3 — FastAPI backend (serves all four pipelines + auto-detect)
+# Terminal 3 FastAPI backend (serves all four pipelines + auto-detect)
 python -m uvicorn main:app --port 8000 --reload
 
-# Terminal 4 — Celery worker (handles all pipelines)
+# Terminal 4 Celery worker (handles all pipelines)
 # Windows:
 python -m celery -A celery_app worker --loglevel=info --pool=solo
 # Linux / macOS:
 python -m celery -A celery_app worker --loglevel=info
 
-# Terminal 5 — Frontend
+# Terminal 5 Frontend
 cd frontend && npm run dev
 ```
 
@@ -268,7 +268,7 @@ cd frontend && npm run dev
 
 Navigate to `http://localhost:3000`:
 - **Know your task?** Choose Classification, Regression, Multi-Class, or Time Series from the landing cards.
-- **Not sure?** Use the **Quick Start** panel — describe your goal, upload a CSV, and the AI detects the correct task type and routes you automatically.
+- **Not sure?** Use the **Quick Start** panel describe your goal, upload a CSV, and the AI detects the correct task type and routes you automatically.
 
 ---
 
@@ -314,7 +314,7 @@ The `POST /auto/jobs` endpoint handles the detection and routing; no additional 
 | Metric | Description | Good threshold |
 |---|---|---|
 | **R² Score** | Variance explained (0–1) | ≥ 0.80 |
-| **RMSE % of mean** | RMSE relative to target mean — scale-independent | ≤ 15% |
+| **RMSE % of mean** | RMSE relative to target mean scale-independent | ≤ 15% |
 | **Within 10% tolerance** | % of predictions with < 10% relative error | ≥ 60% |
 | **Within 15% tolerance** | % of predictions with < 15% relative error | ≥ 70% |
 | **Within 20% tolerance** | % of predictions with < 20% relative error | ≥ 80% |
@@ -338,7 +338,7 @@ A "struggling class" warning is raised if any single class F1 falls below 0.50, 
 
 | Metric | Description | Good threshold |
 |---|---|---|
-| **MAPE** | Mean absolute percentage error — most intuitive | ≤ 10% excellent · ≤ 20% good · ≤ 30% acceptable |
+| **MAPE** | Mean absolute percentage error most intuitive | ≤ 10% excellent · ≤ 20% good · ≤ 30% acceptable |
 | **RMSE** | Root mean squared error | Lower is better; compare as % of target mean |
 | **MAE** | Mean absolute error | Lower is better; same scale as the target |
 
@@ -383,11 +383,11 @@ The model card always includes a plain-English sentence: *"On average, predictio
 
 | Model | Notes |
 |---|---|
-| `XGBRegressor` | Gradient boosting with lag features — most robust for complex patterns |
+| `XGBRegressor` | Gradient boosting with lag features most robust for complex patterns |
 | `LGBMRegressor` | Fast gradient boosting, good on longer series |
 | `RandomForestRegressor` | Strong ensemble, resistant to overfitting |
-| `LinearRegression` | Baseline — fast, interpretable |
-| `Ridge` | Regularized linear — better than LinearRegression when features are collinear |
+| `LinearRegression` | Baseline fast, interpretable |
+| `Ridge` | Regularized linear better than LinearRegression when features are collinear |
 
 All time series models use identical feature engineering: lag features, rolling statistics, and date components.
 
@@ -481,7 +481,7 @@ prometheus/
 ├── celery_app.py                  ← unified Celery worker (all four pipelines)
 ├── start.sh                       ← one-command startup script
 ├── auto/
-│   └── router.py                  ← POST /auto/jobs — AI task-type detection + routing
+│   └── router.py                  ← POST /auto/jobs AI task-type detection + routing
 ├── shared/
 │   ├── llm/
 │   │   ├── router.py              ← routes tasks to Ollama or Gemini
@@ -509,7 +509,7 @@ prometheus/
 │   ├── tasks.py
 │   ├── db.py
 │   └── config.py
-├── multiclassification/           ← multi-class classification pipeline (v3)
+├── multiclassification/           ← multi-class classification pipeline
 │   ├── agents/
 │   ├── routers/
 │   ├── tracking/
@@ -571,38 +571,89 @@ prometheus/
 
 ---
 
+## Testing
+
+Nine ready-made test cases covering all four task types. Download the CSV first, then upload to Prometheus with the prompt below.
+
+### Binary classification
+
+| Test | Dataset | Prompt | Approval screen | Expected |
+|---|---|---|---|---|
+| 1 | [Titanic survival](https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv) | `Predict whether a passenger survived the Titanic disaster. Target column is Survived (1 = survived, 0 = died).` | Binary Classification · Survived · ROC-AUC | ROC-AUC > 0.80 · predictions return 0 or 1 with probability |
+| 2 | [Heart disease](https://raw.githubusercontent.com/sharmaroshan/Heart-UCI-Dataset/master/heart.csv) | `Predict whether a patient has heart disease based on clinical measurements. Target column is target (1 = disease, 0 = no disease).` | Binary Classification · target · ROC-AUC | Accuracy > 85% · confidence > 80% on predictions |
+| 3 | [Customer churn](https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv) | `Predict whether a telecom customer will churn and cancel their subscription. Target column is Churn.` | Binary Classification · Churn · ROC-AUC | Churn column correctly encoded · predictions return Yes/No not 0/1 |
+
+### Regression
+
+| Test | Dataset | Prompt | Approval screen | Expected |
+|---|---|---|---|---|
+| 4 | [California housing](https://raw.githubusercontent.com/ageron/handson-ml/master/datasets/housing/housing.csv) | `Predict the median house value for California districts based on demographic and geographic features. Target column is median_house_value.` | Regression · median_house_value · RMSE | RMSE < $60,000 · predictions return dollar amounts · R² > 0.75 |
+
+### Multi-class classification
+
+| Test | Dataset | Prompt | Approval screen | Expected |
+|---|---|---|---|---|
+| 5 | [Iris species](https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv) | `Classify iris flowers into one of three species based on petal and sepal measurements. Target column is species.` | Multiclass Classification · species · F1 Macro | F1 Macro > 0.95 · all 3 class probabilities shown · setosa at 100% confidence |
+| 6 | [Wine quality](https://raw.githubusercontent.com/dsrscientist/dataset1/master/winequality-red.csv) | `Classify red wine quality as poor, average, or good based on chemical properties. Target column is quality. Bin scores: 1-4=poor, 5-6=average, 7-10=good.` | Multiclass Classification · quality · F1 Macro | F1 Macro 0.70–0.80 · tests class imbalance handling |
+
+### Time series forecasting
+
+| Test | Dataset | Prompt | Approval screen | Expected |
+|---|---|---|---|---|
+| 7 | [Air Passengers](https://raw.githubusercontent.com/jbrownlee/Datasets/master/airline-passengers.csv) | `Forecast monthly airline passenger numbers for the next 12 months. Date column is Month, target column is Passengers.` | Time Series · Month · Passengers · Horizon: 12 · MAPE | MAPE < 15% · forecast chart shows blue/green/orange lines · 12-month table with CSV download |
+| 8 | [Daily temperature](https://raw.githubusercontent.com/jbrownlee/Datasets/master/daily-min-temperatures.csv) | `Forecast daily minimum temperature for the next 30 days. Date column is Date, target column is Temp.` | Time Series · Date · Temp · Horizon: 30 · MAPE | MAPE < 20% · tests daily frequency detection |
+| 9 | [Monthly car sales](https://raw.githubusercontent.com/jbrownlee/Datasets/master/monthly-car-sales.csv) | `Forecast monthly car sales for the next 6 months. Date column is Month, target column is Sales.` | Time Series · Month · Sales · Horizon: 6 · MAPE | MAPE < 25% · tests trend + seasonality detection |
+
+### Sanity checks
+
+| Check | Binary | Regression | Multi-class | Time Series |
+|---|---|---|---|---|
+| Metric shown | ROC-AUC / Accuracy | RMSE / R² | F1 Macro | MAPE / RMSE |
+| Prediction format | 0/1 or Yes/No | Dollar amount | Class name + all probabilities | Future values + chart |
+| Should NOT show | RMSE or dollar amounts | ROC-AUC or Yes/No | Single confidence only | Yes/No or 0/1 |
+
+### Gateway health check
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected: `{"classification":"healthy","regression":"healthy","multiclassification":"healthy","timeseries":"healthy"}`
+
+---
+
 ## Changelog
 
 ### v4.0 (current)
 
-- **Time series forecasting pipeline** — full 10-agent pipeline for sequential data; chronological train/test split (never random); automatic lag features (t-1…t-14), rolling statistics, and date features; MAPE, RMSE, and MAE metrics; recursive N-step forward forecast beyond the dataset
-- **Forecast chart** — Recharts line chart showing historical actuals (blue), test-set predictions (green), and future forecast (orange dashed) with a vertical split line; chart footer shows real RMSE/MAE/MAPE sourced from the winning experiment
-- **Forecast table** — next N forecasted values with generated dates and one-click CSV download
-- **Timeseries-specific approval gate** — dedicated `TimeSeriesApprovalGate` component lets users confirm date column, target column, forecast horizon, and evaluation metric before the pipeline runs
-- **Stationarity / trend / seasonality profiling** — ADF test, linear regression R², and autocorrelation at the seasonal lag displayed as stats tiles above the standard column profile
-- **Time series endpoint** — generated `endpoint.py` exposes `GET /history`, `GET /forecast`, and `POST /predict (recent_values)` instead of the row-feature-based predict used by other services
-- **Auto-detection extended** — `POST /auto/jobs` now detects and routes time series jobs based on datetime columns and forecasting intent
-- **E2B executor extended** — captures `FORECAST:[...]` stdout marker alongside the existing `__MODEL_PKL__:` marker; stores `mae`, `mape`, date strings, and `feature_columns` from output JSON
-- **Gateway updated** — all four services (ports 8001–8004) proxied through gateway with unified health check
-- **Landing page — 4-card grid** — new emerald Time Series card added; grid changed to `sm:grid-cols-2 lg:grid-cols-4`
+- **Time series forecasting pipeline**: full 10-agent pipeline for sequential data; chronological train/test split (never random); automatic lag features (t-1…t-14), rolling statistics, and date features; MAPE, RMSE, and MAE metrics; recursive N-step forward forecast beyond the dataset
+- **Forecast chart**: Recharts line chart showing historical actuals (blue), test-set predictions (green), and future forecast (orange dashed) with a vertical split line; chart footer shows real RMSE/MAE/MAPE sourced from the winning experiment
+- **Forecast table**: next N forecasted values with generated dates and one-click CSV download
+- **Timeseries-specific approval gate**: dedicated `TimeSeriesApprovalGate` component lets users confirm date column, target column, forecast horizon, and evaluation metric before the pipeline runs
+- **Stationarity / trend / seasonality profiling**: ADF test, linear regression R², and autocorrelation at the seasonal lag displayed as stats tiles above the standard column profile
+- **Time series endpoint**: generated `endpoint.py` exposes `GET /history`, `GET /forecast`, and `POST /predict (recent_values)` instead of the row-feature-based predict used by other services
+- **Auto-detection extended**: `POST /auto/jobs` now detects and routes time series jobs based on datetime columns and forecasting intent
+- **E2B executor extended**: captures `FORECAST:[...]` stdout marker alongside the existing `__MODEL_PKL__:` marker; stores `mae`, `mape`, date strings, and `feature_columns` from output JSON
+- **Gateway updated**: all four services (ports 8001–8004) proxied through gateway with unified health check
+- **Landing page**: 4-card grid**: new emerald Time Series card added; grid changed to `sm:grid-cols-2 lg:grid-cols-4`
 
-**Air Passengers benchmark:** MAPE **6.4%** · RMSE **33.98** · MAE **28.79** — 12-month forecast on classic 1949–1960 monthly passenger data; Experiment B (LGBM/XGB with lag features) outperformed Experiment A by 2× on RMSE.
+**Air Passengers benchmark:** MAPE **6.4%** · RMSE **33.98** · MAE **28.79** 12-month forecast on classic 1949–1960 monthly passenger data; Experiment B (LGBM/XGB with lag features) outperformed Experiment A by 2× on RMSE.
 
 ### v3.0
 
-- **Multi-class classification pipeline** — full 10-agent pipeline supporting 3–20 categories; LabelEncoder target handling; per-class F1 stored in pkl; `all_probabilities` on every prediction
-- **AI auto-detection (Quick Start)** — `POST /auto/jobs` detects task type from data + description via LLM; routes to the correct pipeline; frontend shows detected type with reasoning and confidence before redirect
-- **Runner-up model override** — model selection screen redesigned as two interactive radio cards; click either experiment to select it before approving
-- **Dataset interpretation cards** — LLM bullet points rendered as styled, color-coded insight cards instead of raw text
-- **Landing page scrollable** — page now scrolls naturally; Quick Start panel visible below task cards
-- **ApprovalGate extended** — multiclass_classification task type option with appropriate metric choices
-- **`?job=<id>` URL routing** — all pipeline pages accept a pre-created job ID via query param, enabling post-auto-detect redirect
+- **Multi-class classification pipeline** full 10-agent pipeline supporting 3–20 categories; LabelEncoder target handling; per-class F1 stored in pkl; `all_probabilities` on every prediction
+- **AI auto-detection (Quick Start)** `POST /auto/jobs` detects task type from data + description via LLM; routes to the correct pipeline; frontend shows detected type with reasoning and confidence before redirect
+- **Runner-up model override** model selection screen redesigned as two interactive radio cards; click either experiment to select it before approving
+- **Dataset interpretation cards** LLM bullet points rendered as styled, color-coded insight cards instead of raw text
+- **Landing page scrollable** page now scrolls naturally; Quick Start panel visible below task cards
+- **ApprovalGate extended** multiclass_classification task type option with appropriate metric choices
+- **`?job=<id>` URL routing** all pipeline pages accept a pre-created job ID via query param, enabling post-auto-detect redirect
 
 ### v2.0
 
-- **Regression pipeline** — full 10-agent pipeline with log-transform detection, success rate panel (R², RMSE%, tolerance bands), regression-specific test panel
-- **Unified backend** — single FastAPI app on port 8000, single Celery worker; classification and regression isolated in separate modules
-- **Regression success metrics** — R², RMSE as % of mean, within-10/15/20% tolerance computed in E2B sandbox and stored in pkl
+- **Regression pipeline** full 10-agent pipeline with log-transform detection, success rate panel (R², RMSE%, tolerance bands), regression-specific test panel
+- **Unified backend** single FastAPI app on port 8000, single Celery worker; classification and regression isolated in separate modules
+- **Regression success metrics** R², RMSE as % of mean, within-10/15/20% tolerance computed in E2B sandbox and stored in pkl
 
 ### v1.0
 
@@ -618,14 +669,14 @@ prometheus/
 
 ## Known limitations
 
-- **Tabular data only** — no image, text, or audio support
-- **Multi-class range** — targets with more than 20 unique values trigger a warning; use regression or manual binning
-- **Time series minimum length** — at least 50 rows required after lag/rolling feature creation (lags consume 14 rows)
-- **Time series forecast drift** — recursive forecasting propagates errors; longer horizons (> 30 steps) become less reliable
-- **E2B required** — experiments need an active E2B API key and internet access
-- **Ollama must run locally** — LLM inference is not remote; Ollama must be on the same machine as the backend
-- **Windows Celery** — requires `--pool=solo`; Linux/macOS can use the default `prefork` pool
-- **sklearn version coupling** — `model.pkl` is built inside E2B; if loading locally fails, pin `scikit-learn>=1.3.0,<2.0.0`
+- **Tabular data only**: no image, text, or audio support
+- **Multi-class range**: targets with more than 20 unique values trigger a warning; use regression or manual binning
+- **Time series minimum length**: at least 50 rows required after lag/rolling feature creation (lags consume 14 rows)
+- **Time series forecast drift**: recursive forecasting propagates errors; longer horizons (> 30 steps) become less reliable
+- **E2B required**: experiments need an active E2B API key and internet access
+- **Ollama must run locally**: LLM inference is not remote; Ollama must be on the same machine as the backend
+- **Windows Celery**: requires `--pool=solo`; Linux/macOS can use the default `prefork` pool
+- **sklearn version coupling**: `model.pkl` is built inside E2B; if loading locally fails, pin `scikit-learn>=1.3.0,<2.0.0`
 
 ---
 

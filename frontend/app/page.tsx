@@ -180,7 +180,7 @@ export default function Landing() {
       <div className="fixed inset-0 bg-grid opacity-40 pointer-events-none" />
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-8 pt-6 pb-2 shrink-0">
+      <div className="sticky top-0 z-50 flex items-center gap-3 px-8 py-3 shrink-0 bg-ink-950/80 backdrop-blur-md border-b border-ink-800/40">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-blue to-accent-violet flex items-center justify-center shadow-glow-blue">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
             <path d="M12 2L4 7L4 17L12 22L20 17L20 7Z" stroke="white" strokeWidth="1.5" fill="none"/>
@@ -189,7 +189,7 @@ export default function Landing() {
         </div>
         <div>
           <div className="text-[13px] font-semibold tracking-tight">Prometheus</div>
-          <div className="eyebrow text-[9.5px] -mt-px">autonomous ml pipeline · v3</div>
+          <div className="eyebrow text-[9.5px] -mt-px">autonomous ml pipeline</div>
         </div>
       </div>
 

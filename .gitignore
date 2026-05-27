@@ -34,19 +34,16 @@ frontend/.env.production
 *.sqlite3
 mlruns/
 artifacts/
-artifacts/classification/
-artifacts/regression/
-artifacts/multiclassification/
-artifacts/timeseries/
 uploads/
-uploads/classification/
-uploads/regression/
-uploads/multiclassification/
-uploads/timeseries/
 *.pkl
 *.joblib
 *.h5
 *.hdf5
+*.onnx
+*.npy
+*.npz
+*.pt
+*.pth
 
 # Ignore CSVs everywhere except the demo_datasets folder
 *.csv
