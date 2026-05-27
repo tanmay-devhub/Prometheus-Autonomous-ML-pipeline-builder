@@ -13,7 +13,7 @@ Prometheus takes a plain-English description of an ML problem and a CSV file, th
 | Dataset | Accuracy | Unseen rows tested | Notes |
 |---|---|---|---|
 | Titanic (survival) | **80%** | 24 held-out | 0/1 numeric labels, NaN-heavy `Cabin` column |
-| Heart disease | **88%** | 22 held-out | Numeric features, class-balanced |
+| Heart disease | **91%** | 22 held-out | Numeric features, class-balanced |
 | Customer churn | **75%** | 15 held-out | Yes/No string labels, full encoding round-trip |
 
 ### Regression
